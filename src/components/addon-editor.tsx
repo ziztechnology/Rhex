@@ -30,6 +30,10 @@ export function AddonEditor({
   markdownEmojiMap,
   markdownImageUploadEnabled,
   shellClassName,
+  privateReplyPostId,
+  privateReplyRecipient,
+  onPrivateReplyInsert,
+  onClearPrivateReply,
 }: AddonEditorProps) {
   const provider = usePreferredAddonEditorProvider(context)
   const resolvedMarkdownEmojiMap = useMarkdownEmojiMap(markdownEmojiMap)
@@ -47,6 +51,10 @@ export function AddonEditor({
     markdownEmojiMap: resolvedMarkdownEmojiMap,
     markdownImageUploadEnabled: resolvedMarkdownImageUploadEnabled,
     shellClassName,
+    privateReplyPostId,
+    privateReplyRecipient,
+    onPrivateReplyInsert,
+    onClearPrivateReply,
   } satisfies RefinedRichPostEditorProps
 
   const fallback = <RefinedRichPostEditor {...resolvedEditorProps} context={context} />

@@ -2,6 +2,7 @@ import { Prisma, type Prisma as PrismaType } from "@prisma/client"
 
 import { prisma } from "@/db/client"
 import { buildPostDetailInclude, pinnedPostOrderBy, postListInclude } from "@/db/queries"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 const postSeoSelect = {
   id: true,
@@ -71,7 +72,7 @@ export async function findHomepagePosts(page: number, pageSize: number) {
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
     },
     include: postListInclude,
     orderBy: pinnedPostOrderBy,

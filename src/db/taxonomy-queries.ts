@@ -3,6 +3,7 @@ import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import type { Prisma } from "@/db/types"
 import { pinnedPostOrderBy, postListInclude } from "@/db/queries"
 import type { TaxonomyPostSort } from "@/lib/forum-taxonomy-sort"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 const taxonomyPostInclude = {
   board: postListInclude.board,
@@ -67,7 +68,7 @@ export function findTagBySlugOrName(normalized: string) {
 export function findTagPostsBySlugOrName(normalized: string) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       tags: {
         some: {
           tag: {
@@ -118,7 +119,7 @@ export function findAllZonesWithBoards() {
           _count: {
             select: {
               posts: {
-                where: { status: "NORMAL" },
+                where: { status: { in: [...PUBLIC_READABLE_POST_STATUSES] } },
               },
             },
           },
@@ -139,7 +140,7 @@ export function findZoneWithBoardsBySlug(slug: string) {
           _count: {
             select: {
               posts: {
-                where: { status: "NORMAL" },
+                where: { status: { in: [...PUBLIC_READABLE_POST_STATUSES] } },
               },
             },
           },
@@ -165,7 +166,7 @@ export function findZoneBoardListBySlug(slug: string) {
           _count: {
             select: {
               posts: {
-                where: { status: "NORMAL" },
+                where: { status: { in: [...PUBLIC_READABLE_POST_STATUSES] } },
               },
             },
           },
@@ -228,7 +229,7 @@ export function findGlobalPinnedPosts(options?: { pageSize?: number; homeVisible
   return prisma.post.findMany({
     where: {
       ...(options?.homeVisibleOnly ? buildHomeVisiblePostWhere() : {}),
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       pinScope: "GLOBAL",
     },
     include: taxonomyPostInclude,
@@ -242,7 +243,7 @@ export function findZonePinnedPosts(boardIds: string[], pageSize?: number) {
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       pinScope: "ZONE",
       boardId: {
         in: boardIds,
@@ -265,7 +266,7 @@ export function findZoneNormalPosts(
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       boardId: {
         in: boardIds,
       },
@@ -286,7 +287,7 @@ export function countZoneNormalPosts(
 ) {
   return prisma.post.count({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       boardId: {
         in: boardIds,
       },
@@ -301,7 +302,7 @@ export function findBoardPinnedPosts(boardId: string, zoneBoardIds: string[], pa
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       OR: [
         { pinScope: "GLOBAL" },
         { pinScope: "ZONE", boardId: { in: zoneBoardIds } },
@@ -325,7 +326,7 @@ export function findBoardNormalPosts(
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       boardId,
       ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
@@ -344,7 +345,7 @@ export function countBoardNormalPosts(
 ) {
   return prisma.post.count({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       boardId,
       ...buildTaxonomyPostSortWhere(sort),
       id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,

@@ -1,7 +1,7 @@
 /**
  * @file execution-facades.ts
  * @responsibility buildAddonDomainFacades —— 为 addon 执行态注入 7 个 domain Facade
- *   (posts/comments/messages/notifications/follows/points/data)
+ *   (posts/comments/messages/notifications/emails/follows/points/data)
  * @scope Phase E 抽出自 internal/execution-context.ts（降其行数 422→≤400）；
  *   execution-context 聚焦 core context (URL/helper/config/secret/backgroundJobs/scheduler)，
  *   本文件聚焦业务域 Facade 的统一"权限校验 + 委派 runtime/{domain}.ts"模板。
@@ -26,6 +26,7 @@ import {
 } from "@/addons-host/runtime/comments"
 import { followAddonUser } from "@/addons-host/runtime/follows"
 import { sendAddonMessage } from "@/addons-host/runtime/messages"
+import { sendAddonEmail } from "@/addons-host/runtime/emails"
 import {
   createAddonNotification,
   createAddonNotifications,
@@ -49,7 +50,7 @@ import type {
 
 export type AddonDomainFacades = Pick<
   AddonExecutionContextBase,
-  "posts" | "comments" | "messages" | "notifications" | "follows" | "points" | "badges" | "data"
+  "posts" | "comments" | "messages" | "notifications" | "emails" | "follows" | "points" | "badges" | "data"
 >
 
 interface DomainFacadeBuildInput {
@@ -111,6 +112,12 @@ export function buildAddonDomainFacades(
       createMany: async (notificationInputs) => {
         assertRuntimePermission("notification:create", `addon "${addonId}" is not allowed to create notifications`)
         return createAddonNotifications(notificationInputs)
+      },
+    },
+    emails: {
+      send: async (emailInput) => {
+        assertRuntimePermission("email:send", `addon "${addonId}" is not allowed to send emails`)
+        return sendAddonEmail(emailInput)
       },
     },
     follows: {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { Plus, Trash2 } from "lucide-react"
 
 import { useConfirm } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/rbutton"
@@ -19,6 +20,13 @@ interface AiReplyAdminPageProps {
 }
 
 type TaskTabKey = "auto-categorize" | "ai-reply"
+type AgentConfig = AiReplyAdminData["config"]["agents"][number]
+type AgentUser = AiReplyAdminData["agentUsers"][number]
+type AgentDraft = Omit<AgentConfig, "keywordTriggers" | "boardSlugs"> & {
+  agentUsername: string
+  keywordTriggersText: string
+  boardSlugsText: string
+}
 
 const TASK_STATUS_LABELS = {
   PENDING: "待执行",
@@ -83,21 +91,80 @@ function LabeledTextarea(props: {
   )
 }
 
+function splitListText(value: string) {
+  return value
+    .split(/[,\n，、]+/u)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function buildAgentDraft(agent: AgentConfig, user?: AgentUser | null): AgentDraft {
+  return {
+    ...agent,
+    agentUsername: user?.username ?? "",
+    keywordTriggersText: agent.keywordTriggers.join("\n"),
+    boardSlugsText: agent.boardSlugs.join("\n"),
+  }
+}
+
+function buildEmptyAgentDraft(config: AiReplyAdminData["config"], index: number): AgentDraft {
+  return {
+    id: `agent-${Date.now()}-${index}`,
+    enabled: true,
+    label: `AI 助手 ${index}`,
+    agentUserId: null,
+    agentUsername: "",
+    respondToPostMentions: true,
+    respondToCommentMentions: true,
+    autoReplyToAllPosts: false,
+    keywordTriggersText: "",
+    boardSlugsText: "",
+    systemPrompt: config.systemPrompt,
+    postReplyPrompt: config.postReplyPrompt,
+    commentReplyPrompt: config.commentReplyPrompt,
+  }
+}
+
+function buildAgentDrafts(data: AiReplyAdminData): AgentDraft[] {
+  const userMap = new Map(data.agentUsers.map((user) => [user.id, user]))
+  const drafts = data.config.agents.map((agent) => buildAgentDraft(agent, agent.agentUserId ? userMap.get(agent.agentUserId) : null))
+
+  if (drafts.length > 0) {
+    return drafts
+  }
+
+  if (!data.config.agentUserId) {
+    return []
+  }
+
+  return [
+    buildAgentDraft({
+      id: "default",
+      enabled: true,
+      label: "AI 助手",
+      agentUserId: data.config.agentUserId,
+      respondToPostMentions: data.config.respondToPostMentions,
+      respondToCommentMentions: data.config.respondToCommentMentions,
+      autoReplyToAllPosts: false,
+      keywordTriggers: [],
+      boardSlugs: [],
+      systemPrompt: data.config.systemPrompt,
+      postReplyPrompt: data.config.postReplyPrompt,
+      commentReplyPrompt: data.config.commentReplyPrompt,
+    }, data.agentUser),
+  ]
+}
+
 export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   const confirm = useConfirm()
   const [data, setData] = useState(initialData)
   const [enabled, setEnabled] = useState(initialData.config.enabled)
-  const [respondToPostMentions, setRespondToPostMentions] = useState(initialData.config.respondToPostMentions)
-  const [respondToCommentMentions, setRespondToCommentMentions] = useState(initialData.config.respondToCommentMentions)
-  const [agentUsername, setAgentUsername] = useState(initialData.agentUser?.username ?? "")
+  const [agents, setAgents] = useState<AgentDraft[]>(() => buildAgentDrafts(initialData))
   const [baseUrl, setBaseUrl] = useState(initialData.config.baseUrl)
   const [model, setModel] = useState(initialData.config.model)
   const [temperature, setTemperature] = useState(String(initialData.config.temperature))
   const [maxOutputTokens, setMaxOutputTokens] = useState(String(initialData.config.maxOutputTokens))
   const [timeoutMs, setTimeoutMs] = useState(String(initialData.config.timeoutMs))
-  const [systemPrompt, setSystemPrompt] = useState(initialData.config.systemPrompt)
-  const [postReplyPrompt, setPostReplyPrompt] = useState(initialData.config.postReplyPrompt)
-  const [commentReplyPrompt, setCommentReplyPrompt] = useState(initialData.config.commentReplyPrompt)
   const [writeBoardAutoSelectEnabled, setWriteBoardAutoSelectEnabled] = useState(initialData.autoCategorizeConfig.writeBoardAutoSelectEnabled)
   const [writeTagAutoExtractEnabled, setWriteTagAutoExtractEnabled] = useState(initialData.autoCategorizeConfig.writeTagAutoExtractEnabled)
   const [defaultBoardSlug, setDefaultBoardSlug] = useState(initialData.autoCategorizeConfig.defaultBoardSlug)
@@ -114,8 +181,9 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   const [isDeletingAllTaskLogs, setIsDeletingAllTaskLogs] = useState(false)
   const [activeTaskTab, setActiveTaskTab] = useState<TaskTabKey>("auto-categorize")
 
-  const currentAgentLabel = data.agentUser
-    ? `${data.agentUser.nickname ?? data.agentUser.username} (@${data.agentUser.username})`
+  const enabledAgentCount = agents.filter((agent) => agent.enabled && agent.agentUsername.trim()).length
+  const currentAgentLabel = agents.length > 0
+    ? `${enabledAgentCount} / ${agents.length} 个机器人可运行`
     : "未配置"
   const apiKeyStateLabel = clearApiKey
     ? "本次保存会清空当前密钥"
@@ -123,24 +191,19 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
       ? "已保存密钥，留空可保留"
       : "尚未保存密钥"
   const isRunnable = enabled
-    && Boolean(agentUsername.trim())
+    && agents.some((agent) => agent.enabled && agent.agentUsername.trim())
     && Boolean(model.trim())
     && Boolean((apiKey || (clearApiKey ? "" : (data.config.apiKeyConfigured ? "configured" : ""))).trim())
 
   function syncDraftFromData(nextData: AiReplyAdminData) {
     setData(nextData)
     setEnabled(nextData.config.enabled)
-    setRespondToPostMentions(nextData.config.respondToPostMentions)
-    setRespondToCommentMentions(nextData.config.respondToCommentMentions)
-    setAgentUsername(nextData.agentUser?.username ?? "")
+    setAgents(buildAgentDrafts(nextData))
     setBaseUrl(nextData.config.baseUrl)
     setModel(nextData.config.model)
     setTemperature(String(nextData.config.temperature))
     setMaxOutputTokens(String(nextData.config.maxOutputTokens))
     setTimeoutMs(String(nextData.config.timeoutMs))
-    setSystemPrompt(nextData.config.systemPrompt)
-    setPostReplyPrompt(nextData.config.postReplyPrompt)
-    setCommentReplyPrompt(nextData.config.commentReplyPrompt)
     setWriteBoardAutoSelectEnabled(nextData.autoCategorizeConfig.writeBoardAutoSelectEnabled)
     setWriteTagAutoExtractEnabled(nextData.autoCategorizeConfig.writeTagAutoExtractEnabled)
     setDefaultBoardSlug(nextData.autoCategorizeConfig.defaultBoardSlug)
@@ -150,20 +213,37 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
   }
 
   function buildRequestPayload() {
+    const normalizedAgents = agents.map((agent, index) => ({
+      id: agent.id || `agent-${index + 1}`,
+      enabled: agent.enabled,
+      label: agent.label,
+      agentUsername: agent.agentUsername,
+      respondToPostMentions: agent.respondToPostMentions,
+      respondToCommentMentions: agent.respondToCommentMentions,
+      autoReplyToAllPosts: agent.autoReplyToAllPosts,
+      keywordTriggers: splitListText(agent.keywordTriggersText),
+      boardSlugs: splitListText(agent.boardSlugsText),
+      systemPrompt: agent.systemPrompt,
+      postReplyPrompt: agent.postReplyPrompt,
+      commentReplyPrompt: agent.commentReplyPrompt,
+    }))
+    const primaryAgent = normalizedAgents[0]
+
     return {
       config: {
         enabled,
-        respondToPostMentions,
-        respondToCommentMentions,
-        agentUsername,
+        respondToPostMentions: primaryAgent?.respondToPostMentions ?? true,
+        respondToCommentMentions: primaryAgent?.respondToCommentMentions ?? true,
+        agentUsername: primaryAgent?.agentUsername ?? "",
+        agents: normalizedAgents,
         baseUrl,
         model,
         temperature: Number(temperature),
         maxOutputTokens: Number(maxOutputTokens),
         timeoutMs: Number(timeoutMs),
-        systemPrompt,
-        postReplyPrompt,
-        commentReplyPrompt,
+        systemPrompt: primaryAgent?.systemPrompt ?? data.config.systemPrompt,
+        postReplyPrompt: primaryAgent?.postReplyPrompt ?? data.config.postReplyPrompt,
+        commentReplyPrompt: primaryAgent?.commentReplyPrompt ?? data.config.commentReplyPrompt,
       },
       secret: {
         apiKey,
@@ -180,6 +260,20 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
         autoCategorizePage: data.autoCategorizeRecentTasksPagination.page,
       },
     }
+  }
+
+  function updateAgent(agentId: string, patch: Partial<AgentDraft>) {
+    setAgents((current) => current.map((agent) => (
+      agent.id === agentId ? { ...agent, ...patch } : agent
+    )))
+  }
+
+  function addAgent() {
+    setAgents((current) => [...current, buildEmptyAgentDraft(data.config, current.length + 1)])
+  }
+
+  function removeAgent(agentId: string) {
+    setAgents((current) => current.filter((agent) => agent.id !== agentId))
   }
 
   async function loadTaskPage(target: TaskTabKey, page: number) {
@@ -349,9 +443,9 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
         </CardHeader>
         <CardContent className="grid gap-4 py-5 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-border p-4">
-            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">当前代理账号</p>
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">机器人账号</p>
             <p className="mt-2 text-base font-semibold">{currentAgentLabel}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{data.agentUser ? `状态：${data.agentUser.status}` : "保存时按用户名或昵称解析"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{agents.length > 0 ? "每个机器人可独立配置提示词和触发条件" : "保存时按用户名或昵称解析"}</p>
           </div>
           <div className="rounded-xl border border-border p-4">
             <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">任务池</p>
@@ -376,44 +470,25 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
           <CardTitle>AI 配置</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5 py-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-border p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-medium">启用 AI 回复</p>
-                  <p className="mt-1 text-sm text-muted-foreground">总开关，关闭后不会再创建新的 AI 提及任务。</p>
+                  <p className="mt-1 text-sm text-muted-foreground">总开关，关闭后不会再创建新的 AI 回复任务。</p>
                 </div>
                 <Switch checked={enabled} onCheckedChange={setEnabled} />
               </div>
             </div>
             <div className="rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">帖子提及回复</p>
-                  <p className="mt-1 text-sm text-muted-foreground">当帖子正文里出现 @AI 账号时，自动评论回复。</p>
-                </div>
-                <Switch checked={respondToPostMentions} onCheckedChange={setRespondToPostMentions} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-medium">评论提及回复</p>
-                  <p className="mt-1 text-sm text-muted-foreground">当评论里出现 @AI 账号时，自动在楼中楼回复。</p>
-                </div>
-                <Switch checked={respondToCommentMentions} onCheckedChange={setRespondToCommentMentions} />
+              <div>
+                <p className="font-medium">机器人账号</p>
+                <p className="mt-1 text-sm text-muted-foreground">已配置 {agents.length} 个，启用且账号有效 {enabledAgentCount} 个。</p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <TextField
-              label="AI 代理账号"
-              value={agentUsername}
-              onChange={setAgentUsername}
-              placeholder="填写用户名或昵称"
-              autoComplete="username"
-            />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <TextField label="模型接口 Base URL" value={baseUrl} onChange={setBaseUrl} placeholder="https://api.openai.com/v1" />
             <TextField label="模型名称" value={model} onChange={setModel} placeholder="gpt-4.1-mini / qwen-max / deepseek-chat" />
             <div className="space-y-2">
@@ -422,6 +497,121 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
             </div>
             <TextField label="最大输出 Token" value={maxOutputTokens} onChange={setMaxOutputTokens} placeholder="500" />
             <TextField label="请求超时（毫秒）" value={timeoutMs} onChange={setTimeoutMs} placeholder="30000" />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">机器人列表</p>
+                <p className="mt-1 text-sm text-muted-foreground">@ 提及始终优先触发；关键词、主贴自动回复和节点触发按机器人独立配置。</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addAgent}>
+                <Plus data-icon="inline-start" />
+                添加机器人
+              </Button>
+            </div>
+
+            {agents.length > 0 ? agents.map((agent, index) => (
+              <div key={agent.id} className="rounded-xl border border-border p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">机器人 {index + 1}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{agent.agentUsername.trim() ? `账号：@${agent.agentUsername.trim()}` : "保存时按用户名或昵称解析账号"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={agent.enabled} onCheckedChange={(checked) => updateAgent(agent.id, { enabled: checked })} />
+                    <Button type="button" variant="outline" size="icon-sm" onClick={() => removeAgent(agent.id)} aria-label="删除机器人">
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <TextField
+                    label="显示名称"
+                    value={agent.label}
+                    onChange={(value) => updateAgent(agent.id, { label: value })}
+                    placeholder="例如：问答助手"
+                  />
+                  <TextField
+                    label="机器人账号"
+                    value={agent.agentUsername}
+                    onChange={(value) => updateAgent(agent.id, { agentUsername: value })}
+                    placeholder="填写用户名或昵称"
+                    autoComplete="username"
+                  />
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">主贴自动全回</p>
+                        <p className="mt-1 text-sm text-muted-foreground">发新主贴时自动创建回复任务。</p>
+                      </div>
+                      <Switch checked={agent.autoReplyToAllPosts} onCheckedChange={(checked) => updateAgent(agent.id, { autoReplyToAllPosts: checked })} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">帖子 @ 回复</p>
+                        <p className="mt-1 text-sm text-muted-foreground">帖子正文 @ 该账号时触发。</p>
+                      </div>
+                      <Switch checked={agent.respondToPostMentions} onCheckedChange={(checked) => updateAgent(agent.id, { respondToPostMentions: checked })} />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium">评论 @ 回复</p>
+                        <p className="mt-1 text-sm text-muted-foreground">楼层评论 @ 该账号时触发。</p>
+                      </div>
+                      <Switch checked={agent.respondToCommentMentions} onCheckedChange={(checked) => updateAgent(agent.id, { respondToCommentMentions: checked })} />
+                    </div>
+                  </div>
+                  <LabeledTextarea
+                    label="关键词触发"
+                    value={agent.keywordTriggersText}
+                    onChange={(value) => updateAgent(agent.id, { keywordTriggersText: value })}
+                    placeholder="每行一个关键词"
+                    rows={4}
+                  />
+                  <LabeledTextarea
+                    label="节点触发 slug"
+                    value={agent.boardSlugsText}
+                    onChange={(value) => updateAgent(agent.id, { boardSlugsText: value })}
+                    placeholder="每行一个节点 slug，例如 qa"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                  <LabeledTextarea
+                    label="系统提示词"
+                    value={agent.systemPrompt}
+                    onChange={(value) => updateAgent(agent.id, { systemPrompt: value })}
+                    placeholder="定义该机器人的整体角色、语气和输出约束。"
+                  />
+                  <LabeledTextarea
+                    label="主贴回复提示词"
+                    value={agent.postReplyPrompt}
+                    onChange={(value) => updateAgent(agent.id, { postReplyPrompt: value })}
+                    placeholder="定义该机器人回复主贴时的策略。"
+                  />
+                  <LabeledTextarea
+                    label="楼层回复提示词"
+                    value={agent.commentReplyPrompt}
+                    onChange={(value) => updateAgent(agent.id, { commentReplyPrompt: value })}
+                    placeholder="定义该机器人回复楼层评论时的策略。"
+                  />
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                还没有机器人账号，添加后才能触发 AI 回复。
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
@@ -492,27 +682,9 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>提示词</CardTitle>
+          <CardTitle>发帖辅助提示词</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-5 py-5 xl:grid-cols-2 2xl:grid-cols-4">
-          <LabeledTextarea
-            label="系统提示词"
-            value={systemPrompt}
-            onChange={setSystemPrompt}
-            placeholder="定义 AI 的整体角色、语气和输出约束。"
-          />
-          <LabeledTextarea
-            label="帖子提及提示词"
-            value={postReplyPrompt}
-            onChange={setPostReplyPrompt}
-            placeholder="定义 @AI 出现在帖子正文时的回复策略。"
-          />
-          <LabeledTextarea
-            label="评论提及提示词"
-            value={commentReplyPrompt}
-            onChange={setCommentReplyPrompt}
-            placeholder="定义 @AI 出现在评论时的楼中楼回复策略。"
-          />
+        <CardContent className="py-5">
           <LabeledTextarea
             label="发帖辅助提示词"
             value={autoCategorizePromptTemplate}
@@ -646,7 +818,7 @@ export function AiReplyAdminPage({ initialData }: AiReplyAdminPageProps) {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${TASK_STATUS_CLASS_NAMES[task.status]}`}>{TASK_STATUS_LABELS[task.status]}</span>
-                      <span className="text-sm font-medium">{task.sourceType === "POST" ? "帖子提及" : "评论提及"}</span>
+                      <span className="text-sm font-medium">{task.sourceType === "POST" ? "帖子触发" : "评论触发"}</span>
                       <span className="text-sm text-muted-foreground">#{task.id.slice(0, 8)}</span>
                     </div>
                     {canDeleteTaskLog(task.status) ? (

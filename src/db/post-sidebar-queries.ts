@@ -1,4 +1,5 @@
 import { prisma } from "@/db/client"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export async function findPostSidebarData(
   postId: string,
@@ -23,7 +24,7 @@ export async function findPostSidebarData(
     prisma.post.findMany({
       where: {
         id: { not: postId },
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
         OR: [
           {
             author: {

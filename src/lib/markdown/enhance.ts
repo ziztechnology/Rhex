@@ -2,6 +2,7 @@ import { createElement } from "react"
 import { createRoot, type Root } from "react-dom/client"
 
 import { MarkdownLinkIndicator } from "@/components/markdown-link-indicator"
+import { copyTextToClipboard } from "@/lib/clipboard"
 import { buildMarkdownLinkAriaLabel, getMarkdownLinkHint } from "@/lib/markdown/link-hint"
 import { escapeHtml } from "@/lib/markdown/shared"
 
@@ -493,15 +494,9 @@ export function bindBase64Inspector(container: HTMLElement) {
         return
       }
 
-      void navigator.clipboard.writeText(rawText).then(() => {
+      void copyTextToClipboard(rawText).then((copied) => {
         const previousText = copyButton.textContent
-        copyButton.textContent = "已复制"
-        window.setTimeout(() => {
-          copyButton.textContent = previousText
-        }, 1500)
-      }).catch(() => {
-        const previousText = copyButton.textContent
-        copyButton.textContent = "复制失败"
+        copyButton.textContent = copied ? "已复制" : "复制失败"
         window.setTimeout(() => {
           copyButton.textContent = previousText
         }, 1500)
@@ -553,18 +548,10 @@ function appendCodeCopyButtons(container: HTMLElement) {
         return
       }
 
-      try {
-        await navigator.clipboard.writeText(code)
-        button.textContent = "已复制"
-        window.setTimeout(() => {
-          button.textContent = "复制"
-        }, 1500)
-      } catch {
-        button.textContent = "失败"
-        window.setTimeout(() => {
-          button.textContent = "复制"
-        }, 1500)
-      }
+      button.textContent = await copyTextToClipboard(code) ? "已复制" : "失败"
+      window.setTimeout(() => {
+        button.textContent = "复制"
+      }, 1500)
     })
     header.appendChild(button)
   }

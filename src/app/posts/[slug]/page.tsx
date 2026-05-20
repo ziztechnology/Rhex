@@ -49,6 +49,7 @@ import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
 import { getPostAuctionSummary } from "@/lib/post-auctions"
 import { getPurchasedPostAttachmentIds, resolveAttachmentViewerState } from "@/lib/post-attachments"
+import { isPostOpenForReplies, isPublicReadablePostStatus } from "@/lib/post-types"
 
 import { getPurchasedPostBlockBuyerCounts, getPurchasedPostBlockIds } from "@/lib/post-unlock"
 
@@ -184,14 +185,16 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   const replyPermission = boardAccessContext ? checkBoardPermission(currentUser, boardAccessContext.settings, "reply") : { allowed: true, message: "" }
   const postViewPermission = checkPostAccessPermission(currentUser, resolvePostAccessRequirements(basePost))
   const mergedViewPermission = mergeAccessPermissions(viewPermission, postViewPermission)
-  const canViewRestrictedPost = basePost.status === "NORMAL" && (mergedViewPermission.allowed || isOwnerOrManager)
+  const canViewPublicPost = isPublicReadablePostStatus(basePost.status)
+  const canReplyToPost = isPostOpenForReplies(basePost.status)
+  const canViewRestrictedPost = canViewPublicPost && (mergedViewPermission.allowed || isOwnerOrManager)
   const shouldRenderOfflineNotice = basePost.status === "OFFLINE" && !canViewOfflinePost
 
   if (basePost.status === "PENDING" && !canViewPendingPost) {
     notFound()
   }
 
-  if (basePost.status !== "NORMAL" && basePost.status !== "PENDING" && basePost.status !== "OFFLINE" && !isOwnerOrManager) {
+  if (!isPublicReadablePostStatus(basePost.status) && basePost.status !== "PENDING" && basePost.status !== "OFFLINE" && !isOwnerOrManager) {
     notFound()
   }
 
@@ -266,7 +269,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
   ])
 
 
-  if (basePost.status === "NORMAL" && canViewRestrictedPost) {
+  if (canViewRestrictedPost) {
     void incrementPostViewCount(basePost.id)
   }
 
@@ -496,7 +499,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   </div>
                 </CardContent>
               </Card>
-            ) : !canViewRestrictedPost && basePost.status === "NORMAL" ? (
+            ) : !canViewRestrictedPost && canViewPublicPost ? (
               <AccessDeniedCard title="当前帖子暂不可查看" description="该帖子所在节点、分区或帖子本身设置了浏览门槛，未满足条件的用户无法查看帖子正文与互动内容。" reason={mergedViewPermission.message || "当前没有访问权限"} isLoggedIn={Boolean(currentUser)} />
             ) : (
 
@@ -513,7 +516,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                   >
                     <Card className={hasRewardPoolHighlight || hasAppendices ? "rounded-b-none" : undefined}>
                       <CardContent>
-                      {displayPostWithAiIndicator.status === "NORMAL" && canViewRestrictedPost ? (
+                      {canViewRestrictedPost ? (
                         <PostReadingHistoryRecorder
                           postId={displayPostWithAiIndicator.id}
                           postSlug={displayPostWithAiIndicator.slug}
@@ -676,15 +679,17 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                           <MessageCircle className="h-4 w-4" />
                           {displayPost.stats.comments}
                         </span>
-                        {currentUser && displayPost.status === "NORMAL" ? (
+                        {currentUser && canReplyToPost ? (
                           <CommentReplyToggleButton threadId={displayPost.id} />
                         ) : null}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {displayPost.status !== "NORMAL" ? (
-                      <p className="text-sm text-muted-foreground">帖子还在审核阶段，暂不开放公开回复。</p>
+                    {displayPost.status === "LOCKED" ? (
+                      <p className="text-sm text-muted-foreground">帖子已关闭回复，可以继续查看已有讨论。</p>
+                    ) : displayPost.status !== "NORMAL" ? (
+                      <p className="text-sm text-muted-foreground">帖子当前不开放公开回复。</p>
                     ) : !currentUser && !canViewComments ? (
                       <p className="text-sm text-muted-foreground">当前站点已关闭游客查看评论，登录后可查看评论并参与回复讨论。</p>
                     ) : !currentUser ? (
@@ -712,7 +717,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                           perTargetLimit: tipSummary.perPostLimit,
                           usedDailyCount: tipSummary.usedDailyCount,
                         } : undefined}
-                        canReply={Boolean(currentUser && displayPost.status === "NORMAL" && replyPermission.allowed)}
+                        canReply={Boolean(currentUser && canReplyToPost && replyPermission.allowed)}
                         currentPage={commentResult.page}
                         pageSize={commentResult.pageSize}
                         total={commentResult.total}

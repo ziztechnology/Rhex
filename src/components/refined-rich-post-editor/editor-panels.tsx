@@ -1,13 +1,15 @@
 "use client"
 
 import React from "react"
-import { Table2 } from "lucide-react"
+import { createPortal } from "react-dom"
+import { ChevronDown, Search, Table2 } from "lucide-react"
 
 import { Modal } from "@/components/ui/modal"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmojiPicker } from "@/components/emoji-picker"
 import { FloatingEditorPanel } from "@/components/refined-rich-post-editor/floating-panels"
-import type { FloatingPanelPosition, UploadSummary } from "@/components/refined-rich-post-editor/types"
+import type { FloatingPanelPosition, PrivateReplyRecipient, UploadSummary } from "@/components/refined-rich-post-editor/types"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import type { UploadFileResult } from "@/hooks/use-image-upload"
 
@@ -27,65 +29,268 @@ type Base64DialogProps = {
   open: boolean
   value: string
   preview: string
+  mode: "base64" | "private"
+  allowPrivateReply: boolean
+  privateReplyPostId?: string
+  privateValue: string
+  privateRecipient: PrivateReplyRecipient | null
   onChange: (value: string) => void
+  onModeChange: (value: "base64" | "private") => void
+  onPrivateValueChange: (value: string) => void
+  onPrivateRecipientChange: (value: PrivateReplyRecipient | null) => void
   onClose: () => void
   onConfirm: () => void
+  onConfirmPrivate: () => void
 }
 
 export function Base64Dialog({
   open,
   value,
   preview,
+  mode,
+  allowPrivateReply,
+  privateReplyPostId,
+  privateValue,
+  privateRecipient,
   onChange,
+  onModeChange,
+  onPrivateValueChange,
+  onPrivateRecipientChange,
   onClose,
   onConfirm,
+  onConfirmPrivate,
 }: Base64DialogProps) {
+  const [query, setQuery] = React.useState("")
+  const [users, setUsers] = React.useState<PrivateReplyRecipient[]>([])
+  const [loadingUsers, setLoadingUsers] = React.useState(false)
+  const [selectorOpen, setSelectorOpen] = React.useState(false)
+  const selectorButtonRef = React.useRef<HTMLButtonElement | null>(null)
+  const [selectorPosition, setSelectorPosition] = React.useState<React.CSSProperties>({})
+
+  const updateSelectorPosition = React.useCallback(() => {
+    const trigger = selectorButtonRef.current
+    if (!trigger) {
+      return
+    }
+
+    const rect = trigger.getBoundingClientRect()
+    setSelectorPosition({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: Math.min(rect.width, 560),
+    })
+  }, [])
+
+  React.useEffect(() => {
+    if (!open || mode !== "private" || !allowPrivateReply) {
+      return
+    }
+
+    let cancelled = false
+    const controller = new AbortController()
+    setLoadingUsers(true)
+
+    const timeoutId = window.setTimeout(() => {
+      const url = new URL("/api/users/search", window.location.origin)
+      if (query.trim()) {
+        url.searchParams.set("q", query.trim())
+      }
+      if (privateReplyPostId) {
+        url.searchParams.set("postId", privateReplyPostId)
+      }
+
+      fetch(url.toString(), {
+        credentials: "same-origin",
+        signal: controller.signal,
+      })
+        .then((response) => response.ok ? response.json() : null)
+        .then((result) => {
+          if (cancelled) {
+            return
+          }
+
+          const nextUsers = Array.isArray(result?.data?.users)
+            ? result.data.users
+                .map((user: { id?: unknown; username?: unknown; displayName?: unknown; role?: unknown; isPostAuthor?: unknown }) => ({
+                  id: Number(user.id),
+                  username: typeof user.username === "string" ? user.username : "",
+                  displayName: typeof user.displayName === "string" ? user.displayName : "",
+                  role: user.role === "ADMIN" || user.role === "MODERATOR" || user.role === "USER" ? user.role : undefined,
+                  isPostAuthor: user.isPostAuthor === true,
+                }))
+                .filter((user: PrivateReplyRecipient) => Number.isInteger(user.id) && user.id > 0 && user.username && user.displayName)
+            : []
+          setUsers(nextUsers)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setUsers([])
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingUsers(false)
+          }
+        })
+    }, 160)
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      window.clearTimeout(timeoutId)
+    }
+  }, [allowPrivateReply, mode, open, privateReplyPostId, query])
+
+  React.useLayoutEffect(() => {
+    if (!selectorOpen) {
+      return
+    }
+
+    updateSelectorPosition()
+    window.addEventListener("resize", updateSelectorPosition)
+    window.addEventListener("scroll", updateSelectorPosition, true)
+
+    return () => {
+      window.removeEventListener("resize", updateSelectorPosition)
+      window.removeEventListener("scroll", updateSelectorPosition, true)
+    }
+  }, [selectorOpen, updateSelectorPosition])
+
+  React.useEffect(() => {
+    if (!open) {
+      setQuery("")
+      setUsers([])
+      setSelectorOpen(false)
+    }
+  }, [open])
+
+  const primaryDisabled = mode === "base64"
+    ? !preview
+    : !allowPrivateReply || !privateRecipient || !privateValue.trim()
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       size="lg"
-      title="Base64 快捷工具"
-      description="输入文本后会按 UTF-8 编码为 Base64，并插入到当前光标或选区位置。"
+      title="加密内容"
+      description="选择加密方式保护你的内容。"
       footer={(
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            className="rounded-full px-3 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
+            className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             onClick={onClose}
           >
             取消
           </button>
           <button
             type="button"
-            className="rounded-full bg-foreground px-3 py-1.5 text-xs text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={onConfirm}
-            disabled={!preview}
+            className="rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={mode === "base64" ? onConfirm : onConfirmPrivate}
+            disabled={primaryDisabled}
           >
-            插入编码
+            {mode === "base64" ? "加密并插入" : "确认"}
           </button>
         </div>
       )}
     >
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="markdown-base64-input" className="text-sm font-medium text-foreground">
-            原始文本
-          </label>
+      <div className="flex flex-col gap-4">
+        <div className="grid rounded-2xl bg-muted p-1 sm:grid-cols-2">
+          <button
+            type="button"
+            className={mode === "base64" ? "rounded-xl bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm" : "rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"}
+            onClick={() => onModeChange("base64")}
+          >
+            Base64 编码
+          </button>
+          <button
+            type="button"
+            className={mode === "private" ? "rounded-xl bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm" : "rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground"}
+            onClick={() => onModeChange("private")}
+          >
+            私密回复
+          </button>
+        </div>
+
+        {mode === "base64" ? (
           <textarea
             id="markdown-base64-input"
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="输入需要编码的文本"
-            className="min-h-32 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-hidden transition focus:border-foreground"
+            placeholder="输入 要加密的内容..."
+            className="min-h-44 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-hidden transition focus:border-foreground focus:ring-2 focus:ring-ring/40"
           />
-        </div>
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-foreground">编码结果预览</div>
-          <div className="max-h-40 overflow-y-auto rounded-2xl border border-border bg-muted/20 px-4 py-3 font-mono text-xs leading-6 text-muted-foreground">
-            {preview || "输入文本后将在这里显示 Base64 结果"}
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm leading-6 text-muted-foreground">选择可见人后，你输入的回复将以私密方式发送，仅该用户和你本人可见。</p>
+            <div className="relative">
+              <button
+                ref={selectorButtonRef}
+                type="button"
+                className="flex h-14 w-full items-center justify-between rounded-2xl border border-border bg-background px-4 text-left text-sm transition hover:bg-accent/40"
+                onClick={() => {
+                  updateSelectorPosition()
+                  setSelectorOpen((current) => !current)
+                }}
+                disabled={!allowPrivateReply}
+              >
+                <span className={privateRecipient ? "font-medium text-foreground" : "text-muted-foreground"}>
+                  {privateRecipient?.displayName ?? "选择可见人"}
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+              {selectorOpen && typeof document !== "undefined" ? createPortal((
+                <div className="z-[260] overflow-hidden rounded-xl border border-border bg-background shadow-xl" style={selectorPosition}>
+                  <div className="p-3">
+                    <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3">
+                      <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <input
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="搜索用户 ..."
+                        className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-2 pt-0">
+                    {loadingUsers ? (
+                      <p className="px-3 py-3 text-sm text-muted-foreground">搜索中...</p>
+                    ) : users.length > 0 ? (
+                      users.map((user) => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          className={privateRecipient?.id === user.id ? "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg bg-accent px-3 py-2 text-left text-sm font-medium text-accent-foreground" : "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-accent hover:text-accent-foreground"}
+                          onClick={() => {
+                            onPrivateRecipientChange(user)
+                            setSelectorOpen(false)
+                            setQuery("")
+                          }}
+                        >
+                          <span className="min-w-0 truncate">{user.displayName}</span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            {user.isPostAuthor ? <Badge variant="secondary">楼主</Badge> : null}
+                            {user.role === "ADMIN" ? <Badge variant="outline">管理员</Badge> : null}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="px-3 py-3 text-sm text-muted-foreground">没有找到用户</p>
+                    )}
+                  </div>
+                </div>
+              ), document.body) : null}
+            </div>
+            <textarea
+              value={privateValue}
+              onChange={(event) => onPrivateValueChange(event.target.value)}
+              placeholder="输入私密回复内容..."
+              className="min-h-28 w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-hidden transition focus:border-foreground focus:ring-2 focus:ring-ring/40"
+            />
           </div>
-        </div>
+        )}
       </div>
     </Modal>
   )

@@ -1,6 +1,7 @@
 import { prisma } from "@/db/client"
 import { apiError, apiSuccess, createUserRouteHandler, readJsonBody, requireStringField } from "@/lib/api-route"
 import { parsePostContentDocument } from "@/lib/post-content"
+import { isPublicReadablePostStatus } from "@/lib/post-types"
 import { revalidateUserSurfaceCache } from "@/lib/user-surface"
 import { purchasePostBlock } from "@/lib/post-unlock"
 import { createRequestWriteGuardOptions } from "@/lib/write-guard-policies"
@@ -29,7 +30,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
       },
     })
 
-    if (!post || post.status !== "NORMAL") {
+    if (!post || !isPublicReadablePostStatus(post.status)) {
       apiError(404, "帖子不存在或当前不可购买")
     }
 

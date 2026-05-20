@@ -1,4 +1,4 @@
-import { countRootCommentsByPostId, countVisibleCommentsByPostId, createCommentWithRelations, findCommentAuthorByUserId, findCommentParentById, findRootCommentPageById } from "@/db/comment-queries"
+import { countRootCommentsByPostId, countVisibleCommentsByPostId, createCommentWithRelations, findCommentAuthorByUserId, findCommentParentById, findPrivateCommentRecipientById, findRootCommentPageById } from "@/db/comment-queries"
 import { findAnonymousMaskUserById } from "@/db/anonymous-post-queries"
 
 import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
@@ -32,7 +32,7 @@ export async function createCommentFlow(input: {
     apiError(400, validated.message ?? "参数错误")
   }
 
-  const { postId, content, parentId, replyToUserName, replyToCommentId, useAnonymousIdentity: requestedAnonymousIdentity, commentView } = validated.data
+  const { postId, content, parentId, replyToUserName, replyToCommentId, privateRecipientUserId, useAnonymousIdentity: requestedAnonymousIdentity, commentView } = validated.data
   const contentHookResult = await executeAddonWaterfallHook("comment.content.value", content, {
     payload: {
       mode: "create",
@@ -43,16 +43,38 @@ export async function createCommentFlow(input: {
   const contentSafety = await enforceSensitiveText({ scene: "comment.content", text: hookedContent })
   const mentionTexts = extractMentionTexts(contentSafety.sanitizedText)
 
-  const [postContext, dbUser, parentComment, replyTargetComment, mentionUsers] = await Promise.all([
+  const [postContext, dbUser, parentComment, replyTargetComment, privateRecipient, mentionUsers] = await Promise.all([
     getBoardAccessContextByPostId(postId),
     findCommentAuthorByUserId(input.currentUser.id),
     parentId ? findCommentParentById(parentId) : Promise.resolve(null),
     replyToCommentId ? findCommentParentById(replyToCommentId) : Promise.resolve(null),
+    privateRecipientUserId ? findPrivateCommentRecipientById(privateRecipientUserId) : Promise.resolve(null),
     findMentionUsers(mentionTexts),
   ])
 
   if (!postContext || !dbUser || postContext.post.status !== "NORMAL") {
+    if (postContext?.post.status === "LOCKED") {
+      apiError(403, "帖子已关闭回复")
+    }
+
     apiError(404, "帖子不存在或暂不可评论")
+  }
+
+  if (privateRecipientUserId) {
+    if (!privateRecipient || privateRecipient.status !== "ACTIVE") {
+      apiError(400, "私密回复可见人不存在或不可用")
+    }
+
+    if (privateRecipient.id === input.currentUser.id) {
+      apiError(400, "私密回复不能选择自己作为可见人")
+    }
+
+    await ensureUsersCanInteract({
+      actorId: input.currentUser.id,
+      targetUserId: privateRecipient.id,
+      blockedMessage: "你已拉黑该用户，无法发送私密回复",
+      blockedByMessage: "对方已将你拉黑，无法发送私密回复",
+    })
   }
 
   if (postContext.post.authorId !== input.currentUser.id) {
@@ -158,6 +180,9 @@ export async function createCommentFlow(input: {
   }
 
   const resolvedComment = resolveMentionsInText(contentSafety.sanitizedText, mentionUsers)
+  const effectiveMentionUsers = privateRecipientUserId
+    ? resolvedComment.mentions.filter((mention) => mention.id === privateRecipientUserId)
+    : resolvedComment.mentions
   const reviewRequired = Boolean(postContext.settings.requireCommentReview)
   const reviewNote = postContext.settings.requireCommentReview
     ? "当前节点开启回帖审核，评论已进入审核"
@@ -173,12 +198,13 @@ export async function createCommentFlow(input: {
     parentId: normalizedParentId || undefined,
     replyToUserId: normalizedReplyToUserId ?? undefined,
     replyToCommentId: normalizedReplyToCommentId || undefined,
+    privateRecipientUserId: privateRecipientUserId ?? undefined,
     replyPointDelta: postContext.settings.replyPointDelta ?? 0,
     replyPointDeltaPrepared,
     pointName: settings.pointName,
     senderName,
     postAuthorId: postContext.post.authorId,
-    mentionUsers: resolvedComment.mentions,
+    mentionUsers: effectiveMentionUsers,
     normalizedParentId: normalizedParentId || undefined,
     normalizedReplyToUserId,
     boardId: postContext.post.boardId,
@@ -218,7 +244,9 @@ export async function createCommentFlow(input: {
     isRootComment: !normalizedParentId,
     normalizedReplyToUserId,
     normalizedReplyToUserName,
-    mentionUserIds: resolvedComment.mentions.map((mention) => mention.id),
+    privateRecipientUserId,
+    privateRecipientName: privateRecipient ? (privateRecipient.nickname ?? privateRecipient.username) : null,
+    mentionUserIds: effectiveMentionUsers.map((mention) => mention.id),
     senderName,
     contentSafety,
     contentAdjusted: contentHookAdjusted || contentSafety.wasReplaced,

@@ -27,6 +27,7 @@ import { mapListPost } from "@/lib/post-map"
 import { normalizePositiveInteger } from "@/lib/shared/normalizers"
 import { applyHookedUserPresentationToSitePosts } from "@/lib/user-presentation-server"
 import { getUserDisplayName } from "@/lib/users"
+import { getUserAvatarPath } from "@/lib/user-display"
 
 interface CursorPageResultBase {
   pageSize: number
@@ -373,7 +374,7 @@ export async function getUserUserFollows(userId: number, options: { pageSize?: n
         username: follow.following.username,
         displayName: getUserDisplayName(follow.following),
         bio: follow.following.bio?.trim() || "这个用户还没有留下简介。",
-        avatarPath: follow.following.avatarPath,
+        avatarPath: getUserAvatarPath(follow.following),
         status: follow.following.status,
         level: follow.following.level,
         postCount: follow.following.postCount,
@@ -417,7 +418,7 @@ export async function getUserFollowers(userId: number, options: { pageSize?: num
         username: follow.follower.username,
         displayName: getUserDisplayName(follow.follower),
         bio: follow.follower.bio?.trim() || "这个用户还没有留下简介。",
-        avatarPath: follow.follower.avatarPath,
+        avatarPath: getUserAvatarPath(follow.follower),
         status: follow.follower.status,
         level: follow.follower.level,
         postCount: follow.follower.postCount,
@@ -536,7 +537,7 @@ export async function getUserBlocks(userId: number, options: { pageSize?: number
         username: block.blocked.username,
         displayName: getUserDisplayName(block.blocked),
         bio: block.blocked.bio?.trim() || "这个用户还没有留下简介。",
-        avatarPath: block.blocked.avatarPath,
+        avatarPath: getUserAvatarPath(block.blocked),
         status: block.blocked.status,
         level: block.blocked.level,
         postCount: block.blocked.postCount,

@@ -3,6 +3,7 @@ import type { Prisma } from "@/db/types"
 import { prisma } from "@/db/client"
 import { postListInclude } from "@/db/queries"
 import type { TimestampCursorPayload } from "@/lib/cursor-pagination"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export const FOLLOW_TARGET_TYPES = ["board", "user", "tag", "post"] as const
 
@@ -573,7 +574,7 @@ export function countUserPostFollows(userId: number) {
     where: {
       userId,
       post: {
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       },
     },
   })
@@ -588,7 +589,7 @@ export async function findUserPostFollowsByIdCursor(params: { userId: number; pa
     where: {
       userId: params.userId,
       post: {
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       },
       ...(cursor ? buildTimestampCursorWhere(cursor, pagingDirection) : {}),
     },

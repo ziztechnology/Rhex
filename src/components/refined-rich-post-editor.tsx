@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import type { KeyboardEvent as ReactKeyboardEvent } from "react"
 import { createPortal } from "react-dom"
 
 import { useAddonEditorToolbarItems } from "@/addons-host/client/addon-runtime-provider"
@@ -9,6 +10,14 @@ import type {
   AddonEditorToolbarApi,
 } from "@/addons-host/editor-types"
 import { MarkdownEditorHelpDialog } from "@/components/post/markdown-editor-help-dialog"
+import {
+  AiMentionPanel,
+  buildMentionInsertText,
+  findActiveMentionQuery,
+  type ActiveMentionQuery,
+  type MentionChoice,
+  type MentionPanelPosition,
+} from "@/components/refined-rich-post-editor/ai-mention-panel"
 import { TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
 import {
   Base64Dialog,
@@ -19,7 +28,7 @@ import {
   SpoilerInsertPanel,
   TableInsertPanel,
 } from "@/components/refined-rich-post-editor/editor-panels"
-import { EditorBody, EditorHeader, EditorToolbar } from "@/components/refined-rich-post-editor/editor-surface"
+import { EditorBody, EditorHeader, EditorToolbar, PrivateReplyDraftBanner } from "@/components/refined-rich-post-editor/editor-surface"
 import { FloatingSelectionToolbar } from "@/components/refined-rich-post-editor/selection-toolbar"
 import type {
   EditorSelectionRange,
@@ -66,6 +75,61 @@ function createEditorSelectionStore(initialSelection: EditorSelectionRange): Edi
   }
 }
 
+function getTextareaCaretPosition(textarea: HTMLTextAreaElement, position: number): MentionPanelPosition | null {
+  const rect = textarea.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null
+  }
+
+  const computed = window.getComputedStyle(textarea)
+  const mirror = document.createElement("div")
+  const marker = document.createElement("span")
+  const viewportPadding = 12
+  const panelWidth = Math.min(320, window.innerWidth - viewportPadding * 2)
+
+  mirror.style.position = "fixed"
+  mirror.style.visibility = "hidden"
+  mirror.style.pointerEvents = "none"
+  mirror.style.top = `${rect.top - textarea.scrollTop}px`
+  mirror.style.left = `${rect.left - textarea.scrollLeft}px`
+  mirror.style.width = `${rect.width}px`
+  mirror.style.boxSizing = computed.boxSizing
+  mirror.style.font = computed.font
+  mirror.style.letterSpacing = computed.letterSpacing
+  mirror.style.lineHeight = computed.lineHeight
+  mirror.style.padding = computed.padding
+  mirror.style.border = computed.border
+  mirror.style.whiteSpace = "pre-wrap"
+  mirror.style.overflowWrap = "break-word"
+  mirror.style.wordBreak = computed.wordBreak
+
+  mirror.textContent = textarea.value.slice(0, position)
+  marker.textContent = "\u200b"
+  mirror.appendChild(marker)
+  document.body.appendChild(mirror)
+
+  const markerRect = marker.getBoundingClientRect()
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 28
+  document.body.removeChild(mirror)
+
+  const rawLeft = markerRect.left
+  const left = Math.min(Math.max(rawLeft, viewportPadding), Math.max(viewportPadding, window.innerWidth - panelWidth - viewportPadding))
+  const availableBelow = window.innerHeight - (markerRect.top + lineHeight) - viewportPadding
+  const availableAbove = markerRect.top - viewportPadding
+  const maxHeight = Math.max(140, Math.min(280, Math.max(availableBelow, availableAbove)))
+  const placeAbove = availableBelow < 180 && availableAbove > availableBelow
+  const top = placeAbove
+    ? Math.max(viewportPadding, markerRect.top - maxHeight - 8)
+    : Math.min(markerRect.top + lineHeight + 8, window.innerHeight - maxHeight - viewportPadding)
+
+  return {
+    top,
+    left,
+    width: panelWidth,
+    maxHeight,
+  }
+}
+
 export function RefinedRichPostEditor({
   value,
   onChange,
@@ -76,6 +140,10 @@ export function RefinedRichPostEditor({
   markdownEmojiMap: externalMarkdownEmojiMap,
   markdownImageUploadEnabled: externalMarkdownImageUploadEnabled,
   shellClassName,
+  privateReplyPostId,
+  privateReplyRecipient,
+  onPrivateReplyInsert,
+  onClearPrivateReply,
   context = "generic",
 }: RefinedRichPostEditorProps & {
   context?: AddonEditorTarget
@@ -97,6 +165,15 @@ export function RefinedRichPostEditor({
     () => true,
     () => false,
   )
+  const editorSelection = useSyncExternalStore(
+    selectionStore.subscribe,
+    selectionStore.getSnapshot,
+    selectionStore.getSnapshot,
+  )
+  const [activeMention, setActiveMention] = useState<ActiveMentionQuery | null>(null)
+  const [mentionPanelPosition, setMentionPanelPosition] = useState<MentionPanelPosition | null>(null)
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0)
+  const [mentionChoices, setMentionChoices] = useState<MentionChoice[]>([])
   const shortcutPlatform = useMemo(() => (isClient ? getClientPlatform() : "other"), [isClient])
   const markdownEmojiMap = useMarkdownEmojiMap(externalMarkdownEmojiMap)
   const markdownImageUploadEnabled = useMarkdownImageUploadEnabled(externalMarkdownImageUploadEnabled)
@@ -151,6 +228,9 @@ export function RefinedRichPostEditor({
     linkText: panels.linkPanel.text,
     linkUrl: panels.linkPanel.url,
     base64Preview: panels.base64Dialog.preview,
+    privateReplyText: panels.base64Dialog.privateValue,
+    privateReplyRecipient: panels.base64Dialog.privateRecipient,
+    onPrivateReplyInsert,
     setMessage: panels.setMessage,
     toggleLinkPanel: panels.linkPanel.toggle,
     toggleTablePanel: panels.tablePanel.toggle,
@@ -162,6 +242,135 @@ export function RefinedRichPostEditor({
     closeTablePanel: panels.tablePanel.close,
     closeBase64Dialog: panels.base64Dialog.closeDialog,
   })
+
+  const closeMentionPanel = useCallback(() => {
+    setActiveMention(null)
+    setMentionPanelPosition(null)
+    setMentionActiveIndex(0)
+    setMentionChoices([])
+  }, [])
+
+  const handleEditorChange = useCallback((nextValue: string, nextSelection?: EditorSelectionRange) => {
+    if (nextSelection) {
+      updateSelection(nextSelection)
+    }
+    onChange(nextValue)
+  }, [onChange, updateSelection])
+
+  const insertMentionChoice = useCallback((choice: MentionChoice) => {
+    if (!activeMention) {
+      return
+    }
+
+    const insertText = buildMentionInsertText(choice)
+    const nextValue = `${value.slice(0, activeMention.start)}${insertText}${value.slice(activeMention.end)}`
+    const nextSelection = activeMention.start + insertText.length
+    selectionState.applyEditorUpdate({
+      value: nextValue,
+      selectionStart: nextSelection,
+      selectionEnd: nextSelection,
+    })
+    closeMentionPanel()
+  }, [activeMention, closeMentionPanel, selectionState, value])
+
+  const handleEditorKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (activeMention && !event.nativeEvent.isComposing) {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        closeMentionPanel()
+        return
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault()
+        setMentionActiveIndex((current) => (mentionChoices.length > 0 ? (current + 1) % mentionChoices.length : 0))
+        return
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault()
+        setMentionActiveIndex((current) => (mentionChoices.length > 0 ? (current - 1 + mentionChoices.length) % mentionChoices.length : 0))
+        return
+      }
+
+      if ((event.key === "Enter" || event.key === "Tab") && mentionChoices[mentionActiveIndex]) {
+        event.preventDefault()
+        insertMentionChoice(mentionChoices[mentionActiveIndex])
+        return
+      }
+    }
+
+    commands.handleTextareaKeyDown(event)
+  }, [activeMention, closeMentionPanel, commands, insertMentionChoice, mentionActiveIndex, mentionChoices])
+
+  useLayoutEffect(() => {
+    if (disabled || (viewState.activeTab !== "write" && viewState.activeTab !== "live-preview")) {
+      closeMentionPanel()
+      return
+    }
+
+    const nextMention = findActiveMentionQuery(value, editorSelection.start, editorSelection.end)
+    setActiveMention(nextMention)
+    if (!nextMention) {
+      setMentionPanelPosition(null)
+      setMentionChoices([])
+    }
+  }, [closeMentionPanel, disabled, editorSelection.end, editorSelection.start, value, viewState.activeTab])
+
+  const syncMentionPanelPosition = useCallback(() => {
+    const textarea = textareaRef.current
+    if (!activeMention || !textarea) {
+      setMentionPanelPosition(null)
+      return
+    }
+
+    setMentionPanelPosition(getTextareaCaretPosition(textarea, activeMention.end))
+  }, [activeMention])
+
+  useLayoutEffect(() => {
+    if (!activeMention) {
+      return
+    }
+
+    syncMentionPanelPosition()
+    const frameId = window.requestAnimationFrame(syncMentionPanelPosition)
+    return () => {
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [activeMention, syncMentionPanelPosition, value])
+
+  useEffect(() => {
+    if (!activeMention) {
+      return
+    }
+
+    function handleViewportChange() {
+      syncMentionPanelPosition()
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Element)) {
+        return
+      }
+
+      if (textareaRef.current?.contains(target) || target.closest("[data-mention-panel='true']")) {
+        return
+      }
+
+      closeMentionPanel()
+    }
+
+    window.addEventListener("resize", handleViewportChange)
+    window.addEventListener("scroll", handleViewportChange, true)
+    document.addEventListener("mousedown", handlePointerDown)
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange)
+      window.removeEventListener("scroll", handleViewportChange, true)
+      document.removeEventListener("mousedown", handlePointerDown)
+    }
+  }, [activeMention, closeMentionPanel, syncMentionPanelPosition, textareaRef])
 
   const toolbarApi = useMemo<AddonEditorToolbarApi>(() => ({
     focus: () => {
@@ -227,6 +436,10 @@ export function RefinedRichPostEditor({
             onEnterFullscreen={() => viewState.setIsFullscreen(true)}
             onExitFullscreen={() => viewState.setIsFullscreen(false)}
           />
+          <PrivateReplyDraftBanner
+            recipient={privateReplyRecipient}
+            onClear={onClearPrivateReply}
+          />
           <EditorBody
             activeTab={viewState.activeTab}
             isFullscreen={viewState.isFullscreen}
@@ -243,10 +456,10 @@ export function RefinedRichPostEditor({
             lineHeights={viewState.lineHeights}
             activeLineNumber={viewState.activeLineNumber}
             editorScrollTop={viewState.editorScrollTop}
-            onChange={onChange}
+            onChange={handleEditorChange}
             onEditorScrollSync={viewState.setEditorScrollTop}
             onScroll={viewState.handleTextareaScroll}
-            onKeyDown={commands.handleTextareaKeyDown}
+            onKeyDown={handleEditorKeyDown}
             onSelect={viewState.handleTextareaSelect}
             onPaste={commands.handlePaste}
           />
@@ -299,8 +512,9 @@ export function RefinedRichPostEditor({
               onTriggerImageShortcut={commands.triggerImageShortcut}
               onOpenBase64Dialog={panels.base64Dialog.openDialog}
               onOpenHelpDialog={panels.helpDialog.openDialog}
-              onUpload={commands.handleUpload}
-            />
+            onUpload={commands.handleUpload}
+            privateReplyRecipient={privateReplyRecipient}
+          />
             {panels.message ? <p className="mt-2 text-xs text-muted-foreground">{panels.message}</p> : null}
           </div>
         </div>
@@ -319,13 +533,35 @@ export function RefinedRichPostEditor({
         platform={shortcutPlatform}
         markdownEmojiMap={markdownEmojiMap}
       />
+      {isClient ? createPortal(
+        <AiMentionPanel
+          open={Boolean(activeMention)}
+          query={activeMention?.query ?? ""}
+          position={mentionPanelPosition}
+          activeIndex={mentionActiveIndex}
+          onActiveIndexChange={setMentionActiveIndex}
+          onChoicesChange={setMentionChoices}
+          onSelect={insertMentionChoice}
+          onClose={closeMentionPanel}
+        />,
+        document.body,
+      ) : null}
       <Base64Dialog
         open={panels.base64Dialog.open}
         value={panels.base64Dialog.value}
         preview={panels.base64Dialog.preview}
+        mode={panels.base64Dialog.mode}
+        allowPrivateReply={context === "comment" && Boolean(onPrivateReplyInsert)}
+        privateReplyPostId={privateReplyPostId}
+        privateValue={panels.base64Dialog.privateValue}
+        privateRecipient={panels.base64Dialog.privateRecipient}
         onChange={panels.base64Dialog.setValue}
+        onModeChange={panels.base64Dialog.setMode}
+        onPrivateValueChange={panels.base64Dialog.setPrivateValue}
+        onPrivateRecipientChange={panels.base64Dialog.setPrivateRecipient}
         onClose={panels.base64Dialog.dismissDialog}
         onConfirm={commands.handleInsertBase64}
+        onConfirmPrivate={commands.handleInsertPrivateReply}
       />
       <FloatingSelectionToolbar
         visible={!disabled && (viewState.activeTab === "write" || viewState.activeTab === "live-preview")}

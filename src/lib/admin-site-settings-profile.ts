@@ -9,7 +9,7 @@ import { normalizeMarkdownEmojiItems, serializeMarkdownEmojiItems } from "@/lib/
 import { normalizePostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode } from "@/lib/post-list-display"
 import { mergeFooterCopyrightSettings, mergeHomeFeedPostListLoadSettings, mergeHomeSidebarAnnouncementSettings, mergeLeftSidebarDisplaySettings, mergePostPageSizeSettings, mergePostSlugGenerationSettings, mergeSiteBrandingSettings, mergeThemeCustomizationSettings, mergeUserProfileDisplaySettings, normalizeLeftSidebarDisplayMode, normalizePostSlugGenerationMode, resolveFooterCopyrightSettings, resolveHomeFeedPostListLoadSettings, resolveHomeSidebarAnnouncementSettings, resolveLeftSidebarDisplaySettings, resolvePostPageSizeSettings, resolvePostSlugGenerationSettings, resolveSiteBrandingSettings, resolveThemeCustomizationSettingsFromAppState, resolveUserProfileDisplaySettings } from "@/lib/site-settings-app-state"
-import { normalizeHeaderAppIconName, normalizeSiteHeaderAppLinks } from "@/lib/site-header-app-links"
+import { mergeTopHeaderAppLinks, normalizeHeaderAppIconName, normalizeSiteHeaderAppLinks } from "@/lib/site-header-app-links"
 import { mergeSiteSearchSettings, resolveSiteSearchSettings } from "@/lib/site-search-settings"
 import { normalizeFooterLinks } from "@/lib/shared/config-parsers"
 import { resolveThemeCustomizationSettings } from "@/lib/theme"
@@ -171,12 +171,13 @@ export async function updateProfileSiteSettingsSection(existing: SiteSettingsRec
   if (section === "site-apps") {
     const headerAppLinks = normalizeSiteHeaderAppLinks(body.headerAppLinks)
     const headerAppIconName = normalizeHeaderAppIconName(body.headerAppIconName)
+    const appStateJson = mergeTopHeaderAppLinks(existing.appStateJson, body.topHeaderAppLinks)
 
-    await updateSiteSettingsHeaderApps(existing.id, JSON.stringify(headerAppLinks), headerAppIconName)
+    await updateSiteSettingsHeaderApps(existing.id, JSON.stringify(headerAppLinks), headerAppIconName, appStateJson)
 
     return finalizeSiteSettingsUpdate({
       settings: undefined,
-      message: "应用入口已保存",
+      message: "顶部导航已保存",
       revalidatePaths: ["/", "/admin"],
     })
   }

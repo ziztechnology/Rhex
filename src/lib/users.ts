@@ -10,7 +10,7 @@ import {
   applyHookedUserPresentationToSitePosts,
 } from "@/lib/user-presentation-server"
 import { resolveUserProfileSettings } from "@/lib/user-profile-settings"
-import { getUserDisplayName } from "@/lib/user-display"
+import { getUserAvatarPath, getUserDisplayName } from "@/lib/user-display"
 import { withRuntimeFallback } from "@/lib/runtime-errors"
 
 export type PublicUserStatus = "ACTIVE" | "MUTED" | "BANNED" | "INACTIVE"
@@ -97,7 +97,7 @@ export async function getUserProfile(username: string): Promise<SiteUserProfile 
       role: user.role,
       bio: user.bio ?? "这个用户还没有留下简介。",
       introduction: profileSettings.introduction,
-      avatarPath: user.avatarPath,
+      avatarPath: getUserAvatarPath(user),
       gender: user.gender,
       status: user.status,
       level: user.level,

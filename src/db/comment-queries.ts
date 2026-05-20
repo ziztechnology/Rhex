@@ -122,6 +122,9 @@ export function buildCommentListInclude(viewerUserId?: number) {
     user: {
       select: commentUserSelect,
     },
+    privateRecipient: {
+      select: commentUserSelect,
+    },
     likes: buildCommentViewerLikesInclude(viewerUserId),
   }
 }
@@ -137,14 +140,21 @@ export function buildCommentReplyInclude(viewerUserId?: number) {
         status: true,
         userId: true,
         useAnonymousIdentity: true,
+        privateRecipientUserId: true,
         content: true,
         createdAt: true,
+        privateRecipient: {
+          select: commentUserSelect,
+        },
         user: {
           select: commentUserSelect,
         },
       },
     },
     replyToUser: {
+      select: commentUserSelect,
+    },
+    privateRecipient: {
       select: commentUserSelect,
     },
     likes: buildCommentViewerLikesInclude(viewerUserId),
@@ -162,8 +172,12 @@ export function buildFlatCommentInclude(viewerUserId?: number) {
         status: true,
         userId: true,
         useAnonymousIdentity: true,
+        privateRecipientUserId: true,
         content: true,
         createdAt: true,
+        privateRecipient: {
+          select: commentUserSelect,
+        },
       },
     },
     replyToComment: {
@@ -172,8 +186,12 @@ export function buildFlatCommentInclude(viewerUserId?: number) {
         status: true,
         userId: true,
         useAnonymousIdentity: true,
+        privateRecipientUserId: true,
         content: true,
         createdAt: true,
+        privateRecipient: {
+          select: commentUserSelect,
+        },
         user: {
           select: commentUserSelect,
         },
@@ -182,8 +200,23 @@ export function buildFlatCommentInclude(viewerUserId?: number) {
     replyToUser: {
       select: commentUserSelect,
     },
+    privateRecipient: {
+      select: commentUserSelect,
+    },
     likes: buildCommentViewerLikesInclude(viewerUserId),
   }
+}
+
+export function findPrivateCommentRecipientById(userId: number) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      status: true,
+    },
+  })
 }
 
 function buildCommentVisibilityWhere(params: {
@@ -819,6 +852,7 @@ export async function createCommentWithRelations(params: {
   parentId?: string
   replyToUserId?: number
   replyToCommentId?: string
+  privateRecipientUserId?: number
   replyPointDelta: number
   replyPointDeltaPrepared: PreparedPointDelta
   pointName: string
@@ -839,6 +873,7 @@ export async function createCommentWithRelations(params: {
         parentId: params.parentId || undefined,
         replyToUserId: params.replyToUserId ?? undefined,
         replyToCommentId: params.replyToCommentId ?? undefined,
+        privateRecipientUserId: params.privateRecipientUserId ?? undefined,
         status: params.status,
         reviewNote: params.status === "PENDING" ? (params.reviewNote ?? "评论已进入审核") : null,
       },

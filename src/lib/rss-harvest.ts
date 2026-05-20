@@ -3,6 +3,7 @@ import { resolvePagination, type PaginationResult } from "@/db/helpers"
 import type { Prisma, RssLogLevel, RssTriggerType } from "@/db/types"
 import {
   countRssEntriesForSource,
+  countPendingRssSourceApplications,
   createManyRssEntries,
   createRssSourceRecord,
   findRssSourceByFeedUrl,
@@ -140,6 +141,7 @@ export interface RssAdminData {
   sources: Array<{
     id: string
     siteName: string
+    description: string | null
     feedUrl: string
     logoPath: string | null
     intervalMinutes: number
@@ -183,6 +185,7 @@ export interface RssAdminData {
       errorMessage: string | null
     }>
   }>
+  pendingSourceApplicationCount: number
   recentRunsPagination: RssPaginationMeta
   recentRuns: Array<{
     id: string
@@ -781,6 +784,7 @@ function normalizeSourceInput(input: Record<string, unknown>) {
   }
 
   const feedUrl = normalizeAbsoluteHttpUrl(input.feedUrl, "RSS 地址")
+  const description = normalizeTrimmedText(input.description, 240) || null
   const intervalMinutes = Math.trunc(normalizeNumber(input.intervalMinutes, 30, { min: MIN_INTERVAL_MINUTES, max: MAX_INTERVAL_MINUTES }))
   assertPositiveInteger(intervalMinutes, MIN_INTERVAL_MINUTES, MAX_INTERVAL_MINUTES, `抓取频率必须在 ${MIN_INTERVAL_MINUTES} 到 ${MAX_INTERVAL_MINUTES} 分钟之间`)
 
@@ -793,6 +797,7 @@ function normalizeSourceInput(input: Record<string, unknown>) {
 
   return {
     siteName,
+    description,
     feedUrl,
     logoPath: normalizeTrimmedText(input.logoPath, 300) || null,
     intervalMinutes,
@@ -908,6 +913,7 @@ async function buildSourceAdminItem(
   return {
     id: source.id,
     siteName: source.siteName,
+    description: source.description ?? null,
     feedUrl: source.feedUrl,
     logoPath: source.logoPath ?? null,
     intervalMinutes: source.intervalMinutes,
@@ -967,7 +973,7 @@ export async function getRssAdminData(options?: {
   recentLogsPage?: number
 }): Promise<RssAdminData> {
   await cleanupStaleRssDelayedJobs()
-  const [settings, schedulerStatus, allSources, recentLogsPage, allQueueItems] = await Promise.all([
+  const [settings, schedulerStatus, allSources, recentLogsPage, allQueueItems, pendingSourceApplicationCount] = await Promise.all([
     getOrCreateRssSettingRecord(),
     getRssSchedulerStatus(),
     listRssSourcesForAdmin(),
@@ -976,6 +982,7 @@ export async function getRssAdminData(options?: {
       pageSize: RSS_MODAL_PAGE_SIZE,
     }),
     listAllRssQueueItems(),
+    countPendingRssSourceApplications(),
   ])
   const queueSummary = summarizeQueueItems(allQueueItems)
   const allExecutionItems = allQueueItems
@@ -1054,6 +1061,7 @@ export async function getRssAdminData(options?: {
     queueSummary,
     sourcePagination: serializePagination(sourcePagination),
     sources: sourceItems,
+    pendingSourceApplicationCount,
     recentRunsPagination: serializePagination(recentRunsPagination),
     recentRuns: recentRuns.map((run) => serializeRunRecord(run, recentRunSourceMap.get(run.sourceId) ?? run.sourceId)),
     recentLogsPagination: {
@@ -1221,6 +1229,7 @@ export async function createRssSource(input: Record<string, unknown>) {
 
   const created = await createRssSourceRecord({
     siteName: normalized.siteName,
+    description: normalized.description,
     feedUrl: normalized.feedUrl,
     logoPath: normalized.logoPath,
     intervalMinutes: normalized.intervalMinutes,
@@ -1276,6 +1285,7 @@ export async function updateRssSource(id: string, input: Record<string, unknown>
 
   const updated = await updateRssSourceRecord(id, {
     siteName: normalized.siteName,
+    description: normalized.description,
     feedUrl: normalized.feedUrl,
     logoPath: normalized.logoPath,
     intervalMinutes: normalized.intervalMinutes,

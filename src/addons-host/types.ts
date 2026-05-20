@@ -1168,6 +1168,25 @@ export interface AddonNotificationsApi {
   ) => Promise<AddonNotificationRecord[]>
 }
 
+export interface AddonEmailSendInput {
+  recipientId?: number
+  recipientUsername?: string
+  subject: string
+  text?: string
+  html?: string
+}
+
+export interface AddonEmailSendResult {
+  userId: number
+  username: string
+  sent: true
+  sentAt: string
+}
+
+export interface AddonEmailsApi {
+  send: (input: AddonEmailSendInput) => Promise<AddonEmailSendResult>
+}
+
 export interface AddonUserFollowInput {
   followerId?: number
   followerUsername?: string
@@ -1309,6 +1328,7 @@ export interface AddonExecutionContextBase extends AddonRuntimeDescriptor {
   comments: AddonCommentsApi
   messages: AddonMessagesApi
   notifications: AddonNotificationsApi
+  emails: AddonEmailsApi
   follows: AddonFollowsApi
   points: AddonPointsApi
   badges: AddonBadgesApi

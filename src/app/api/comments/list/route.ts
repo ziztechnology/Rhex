@@ -4,6 +4,7 @@ import { checkBoardPermission, getBoardAccessContextByPostId } from "@/lib/board
 import { getCommentsByPostId } from "@/lib/comments"
 import { getAnonymousMaskDisplayIdentity } from "@/lib/post-anonymous"
 import { checkPostAccessPermission, mergeAccessPermissions, resolvePostAccessRequirements } from "@/lib/post-access"
+import { isPublicReadablePostStatus } from "@/lib/post-types"
 import { getSiteSettings } from "@/lib/site-settings"
 import { canManageBoard, resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
 
@@ -43,7 +44,7 @@ export const GET = createRouteHandler(async ({ request }) => {
   const isPostOwner = currentUser?.id === boardAccessContext.post.authorId
   const isOwnerOrManager = Boolean(isPostOwner || canManageThisPost)
 
-  if (boardAccessContext.post.status !== "NORMAL" && !isOwnerOrManager) {
+  if (!isPublicReadablePostStatus(boardAccessContext.post.status) && !isOwnerOrManager) {
     apiError(404, "帖子不存在")
   }
 
@@ -55,7 +56,7 @@ export const GET = createRouteHandler(async ({ request }) => {
   const viewPermission = checkBoardPermission(currentUser, boardAccessContext.settings, "view")
   const postViewPermission = checkPostAccessPermission(currentUser, resolvePostAccessRequirements(boardAccessContext.post))
   const mergedViewPermission = mergeAccessPermissions(viewPermission, postViewPermission)
-  const canViewRestrictedPost = boardAccessContext.post.status === "NORMAL" && (mergedViewPermission.allowed || isOwnerOrManager)
+  const canViewRestrictedPost = isPublicReadablePostStatus(boardAccessContext.post.status) && (mergedViewPermission.allowed || isOwnerOrManager)
 
   if (!canViewRestrictedPost && !isOwnerOrManager) {
     apiError(403, mergedViewPermission.message || "无权查看该帖评论")

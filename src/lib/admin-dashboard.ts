@@ -30,6 +30,7 @@ export interface AdminDashboardData {
     pendingBoardApplicationCount: number
     pendingVerificationCount: number
     pendingFriendLinkCount: number
+    pendingRssSourceApplicationCount: number
     pendingAdOrderCount: number
     activeUserCount7d: number
     mutedUserCount: number

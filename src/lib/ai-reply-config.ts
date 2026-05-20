@@ -4,8 +4,9 @@ import { apiError, type JsonObject } from "@/lib/api-route"
 import { getAiAppConfig, isRecord, updateAiAppConfig } from "@/lib/ai/config"
 import { parseNonNegativeSafeInteger, parsePositiveSafeInteger } from "@/lib/shared/safe-integer"
 
-const AI_REPLY_APP_KEY = "app.ai-reply"
+export const AI_REPLY_APP_KEY = "app.ai-reply"
 const AI_REPLY_SENSITIVE_KEY = "aiReplyConfig"
+const AI_REPLY_DEFAULT_AGENT_ID = "default"
 
 const AI_REPLY_DEFAULTS = {
   enabled: false,
@@ -41,11 +42,27 @@ export interface AiReplyConfigData {
   systemPrompt: string
   postReplyPrompt: string
   commentReplyPrompt: string
+  agents: AiReplyAgentConfigData[]
   apiKeyConfigured: boolean
 }
 
 export interface ServerAiReplyConfigData extends Omit<AiReplyConfigData, "apiKeyConfigured"> {
   apiKey: string | null
+}
+
+export interface AiReplyAgentConfigData {
+  id: string
+  enabled: boolean
+  label: string
+  agentUserId: number | null
+  respondToPostMentions: boolean
+  respondToCommentMentions: boolean
+  autoReplyToAllPosts: boolean
+  keywordTriggers: string[]
+  boardSlugs: string[]
+  systemPrompt: string
+  postReplyPrompt: string
+  commentReplyPrompt: string
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
@@ -94,6 +111,97 @@ function normalizeAgentUserId(value: unknown, fallback: number | null): number |
   return typeof parsed === "number" ? parsed : fallback
 }
 
+function normalizeStringList(value: unknown, maxItems: number, maxItemLength: number): string[] {
+  const source = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/[,\n，、]+/u)
+      : []
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const item of source) {
+    const normalized = typeof item === "string" ? item.trim().slice(0, maxItemLength) : ""
+    if (!normalized || seen.has(normalized)) {
+      continue
+    }
+
+    seen.add(normalized)
+    result.push(normalized)
+    if (result.length >= maxItems) {
+      break
+    }
+  }
+
+  return result
+}
+
+function buildDefaultAgentConfig(cfg: Record<string, unknown>, fallback?: Partial<AiReplyAgentConfigData>): AiReplyAgentConfigData {
+  return {
+    id: typeof fallback?.id === "string" && fallback.id.trim() ? fallback.id.trim() : AI_REPLY_DEFAULT_AGENT_ID,
+    enabled: normalizeBoolean(cfg.enabled, fallback?.enabled ?? true),
+    label: normalizeRequiredString(cfg.label, fallback?.label ?? "AI 助手", 80),
+    agentUserId: normalizeAgentUserId(cfg.agentUserId, fallback?.agentUserId ?? AI_REPLY_DEFAULTS.agentUserId),
+    respondToPostMentions: normalizeBoolean(cfg.respondToPostMentions, fallback?.respondToPostMentions ?? AI_REPLY_DEFAULTS.respondToPostMentions),
+    respondToCommentMentions: normalizeBoolean(cfg.respondToCommentMentions, fallback?.respondToCommentMentions ?? AI_REPLY_DEFAULTS.respondToCommentMentions),
+    autoReplyToAllPosts: normalizeBoolean(cfg.autoReplyToAllPosts, fallback?.autoReplyToAllPosts ?? false),
+    keywordTriggers: normalizeStringList(cfg.keywordTriggers, 30, 40),
+    boardSlugs: normalizeStringList(cfg.boardSlugs, 50, 80).map((item) => item.toLowerCase()),
+    systemPrompt: normalizeRequiredString(cfg.systemPrompt, fallback?.systemPrompt ?? AI_REPLY_DEFAULTS.systemPrompt, 4_000),
+    postReplyPrompt: normalizeRequiredString(cfg.postReplyPrompt, fallback?.postReplyPrompt ?? AI_REPLY_DEFAULTS.postReplyPrompt, 2_000),
+    commentReplyPrompt: normalizeRequiredString(cfg.commentReplyPrompt, fallback?.commentReplyPrompt ?? AI_REPLY_DEFAULTS.commentReplyPrompt, 2_000),
+  }
+}
+
+function normalizeAiReplyAgents(cfg: Record<string, unknown>): AiReplyAgentConfigData[] {
+  const rawAgents = Array.isArray(cfg.agents) ? cfg.agents : []
+  if (rawAgents.length === 0) {
+    const legacyAgent = buildDefaultAgentConfig({
+      enabled: true,
+      label: "AI 助手",
+      agentUserId: cfg.agentUserId,
+      respondToPostMentions: cfg.respondToPostMentions,
+      respondToCommentMentions: cfg.respondToCommentMentions,
+      systemPrompt: cfg.systemPrompt,
+      postReplyPrompt: cfg.postReplyPrompt,
+      commentReplyPrompt: cfg.commentReplyPrompt,
+    })
+    return legacyAgent.agentUserId ? [legacyAgent] : []
+  }
+
+  const seenIds = new Set<string>()
+  const seenUserIds = new Set<number>()
+  const result: AiReplyAgentConfigData[] = []
+
+  for (const rawAgent of rawAgents) {
+    if (!isRecord(rawAgent)) {
+      continue
+    }
+
+    const agent = buildDefaultAgentConfig(rawAgent as Record<string, unknown>, {
+      id: typeof rawAgent.id === "string" ? rawAgent.id : `agent-${result.length + 1}`,
+    })
+    const normalizedId = agent.id.replace(/[^\w.-]/g, "").slice(0, 80) || `agent-${result.length + 1}`
+    const nextId = seenIds.has(normalizedId) ? `${normalizedId}-${result.length + 1}` : normalizedId
+    agent.id = nextId
+
+    if (agent.agentUserId && seenUserIds.has(agent.agentUserId)) {
+      continue
+    }
+
+    seenIds.add(nextId)
+    if (agent.agentUserId) {
+      seenUserIds.add(agent.agentUserId)
+    }
+    result.push(agent)
+    if (result.length >= 20) {
+      break
+    }
+  }
+
+  return result
+}
+
 function clampPositiveInt(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = parsePositiveSafeInteger(value)
   const base = typeof parsed === "number" ? parsed : fallback
@@ -108,19 +216,22 @@ function clampNonNegativeInt(value: unknown, fallback: number, min: number, max:
 
 function normalizeAiReplyConfig(entry: Record<string, unknown> | null, apiKey: string | null): ServerAiReplyConfigData {
   const cfg = entry && isRecord(entry.config) ? (entry.config as Record<string, unknown>) : {}
+  const agents = normalizeAiReplyAgents(cfg)
+  const primaryAgent = agents[0] ?? null
   return {
     enabled: normalizeBoolean(entry?.enabled, AI_REPLY_DEFAULTS.enabled),
     baseUrl: normalizeBaseUrl(cfg.baseUrl, AI_REPLY_DEFAULTS.baseUrl),
     model: normalizeOptionalString(cfg.model, AI_REPLY_DEFAULTS.model, 200),
-    agentUserId: normalizeAgentUserId(cfg.agentUserId, AI_REPLY_DEFAULTS.agentUserId),
-    respondToPostMentions: normalizeBoolean(cfg.respondToPostMentions, AI_REPLY_DEFAULTS.respondToPostMentions),
-    respondToCommentMentions: normalizeBoolean(cfg.respondToCommentMentions, AI_REPLY_DEFAULTS.respondToCommentMentions),
+    agentUserId: primaryAgent?.agentUserId ?? normalizeAgentUserId(cfg.agentUserId, AI_REPLY_DEFAULTS.agentUserId),
+    respondToPostMentions: primaryAgent?.respondToPostMentions ?? normalizeBoolean(cfg.respondToPostMentions, AI_REPLY_DEFAULTS.respondToPostMentions),
+    respondToCommentMentions: primaryAgent?.respondToCommentMentions ?? normalizeBoolean(cfg.respondToCommentMentions, AI_REPLY_DEFAULTS.respondToCommentMentions),
     temperature: normalizeTemperature(cfg.temperature, AI_REPLY_DEFAULTS.temperature),
     maxOutputTokens: clampPositiveInt(cfg.maxOutputTokens, AI_REPLY_DEFAULTS.maxOutputTokens, 64, 4_000),
     timeoutMs: clampNonNegativeInt(cfg.timeoutMs, AI_REPLY_DEFAULTS.timeoutMs, 5_000, 120_000),
-    systemPrompt: normalizeRequiredString(cfg.systemPrompt, AI_REPLY_DEFAULTS.systemPrompt, 4_000),
-    postReplyPrompt: normalizeRequiredString(cfg.postReplyPrompt, AI_REPLY_DEFAULTS.postReplyPrompt, 2_000),
-    commentReplyPrompt: normalizeRequiredString(cfg.commentReplyPrompt, AI_REPLY_DEFAULTS.commentReplyPrompt, 2_000),
+    systemPrompt: primaryAgent?.systemPrompt ?? normalizeRequiredString(cfg.systemPrompt, AI_REPLY_DEFAULTS.systemPrompt, 4_000),
+    postReplyPrompt: primaryAgent?.postReplyPrompt ?? normalizeRequiredString(cfg.postReplyPrompt, AI_REPLY_DEFAULTS.postReplyPrompt, 2_000),
+    commentReplyPrompt: primaryAgent?.commentReplyPrompt ?? normalizeRequiredString(cfg.commentReplyPrompt, AI_REPLY_DEFAULTS.commentReplyPrompt, 2_000),
+    agents,
     apiKey,
   }
 }
@@ -139,7 +250,7 @@ export async function getAiReplyConfig(): Promise<AiReplyConfigData> {
 export function isAiReplyConfigRunnable(config: ServerAiReplyConfigData): boolean {
   return Boolean(
     config.enabled
-    && config.agentUserId
+    && config.agents.some((agent) => agent.enabled && agent.agentUserId)
     && config.model.trim()
     && config.baseUrl.trim()
     && config.apiKey?.trim(),
@@ -148,7 +259,7 @@ export function isAiReplyConfigRunnable(config: ServerAiReplyConfigData): boolea
 
 export function isAiReplyConfigTestable(config: ServerAiReplyConfigData): boolean {
   return Boolean(
-    config.agentUserId
+    config.agents.some((agent) => agent.enabled && agent.agentUserId)
     && config.model.trim()
     && config.baseUrl.trim()
     && config.apiKey?.trim(),
@@ -176,6 +287,7 @@ function buildNextAiReplyStateEntry(existing: Record<string, unknown> | null, co
       systemPrompt: config.systemPrompt,
       postReplyPrompt: config.postReplyPrompt,
       commentReplyPrompt: config.commentReplyPrompt,
+      agents: config.agents,
     },
     status: "active" as const,
     version: pickStr("version") ?? "hosted",
@@ -195,6 +307,7 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
   const secretInput: Record<string, unknown> = isRecord(body.secret) ? (body.secret as Record<string, unknown>) : {}
 
   const agentUsernameInput = typeof configInput.agentUsername === "string" ? configInput.agentUsername.trim() : undefined
+  const rawAgentsInput = Array.isArray(configInput.agents) ? configInput.agents : null
 
   let nextAgentUserId = current.agentUserId
   if (typeof agentUsernameInput === "string") {
@@ -212,9 +325,68 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
     }
   }
 
-  const resolvedAgentUser = nextAgentUserId
+  let nextAgents = current.agents
+  if (rawAgentsInput) {
+    const resolvedAgents: AiReplyAgentConfigData[] = []
+    const seenUserIds = new Set<number>()
+
+    for (let index = 0; index < rawAgentsInput.length && resolvedAgents.length < 20; index += 1) {
+      const rawAgent = rawAgentsInput[index]
+      if (!isRecord(rawAgent)) {
+        continue
+      }
+
+      const agentUsername = typeof rawAgent.agentUsername === "string" ? rawAgent.agentUsername.trim() : ""
+      let agentUserId = normalizeAgentUserId(rawAgent.agentUserId, null)
+      if (agentUsername) {
+        const agentUser = await prisma.user.findFirst({
+          where: { OR: [{ username: agentUsername }, { nickname: agentUsername }] },
+          select: { id: true },
+        })
+        if (!agentUser) {
+          apiError(400, `机器人账号不存在：${agentUsername}`)
+        }
+        agentUserId = agentUser.id
+      }
+
+      const agent = buildDefaultAgentConfig({
+        ...rawAgent,
+        agentUserId,
+      }, {
+        id: typeof rawAgent.id === "string" ? rawAgent.id : `agent-${index + 1}`,
+      })
+
+      if (!agent.agentUserId || seenUserIds.has(agent.agentUserId)) {
+        continue
+      }
+
+      seenUserIds.add(agent.agentUserId)
+      resolvedAgents.push(agent)
+    }
+
+    nextAgents = resolvedAgents
+  } else if (typeof agentUsernameInput === "string") {
+    nextAgents = nextAgentUserId
+      ? [
+          buildDefaultAgentConfig({
+            enabled: true,
+            label: current.agents[0]?.label ?? "AI 助手",
+            agentUserId: nextAgentUserId,
+            respondToPostMentions: configInput.respondToPostMentions,
+            respondToCommentMentions: configInput.respondToCommentMentions,
+            systemPrompt: configInput.systemPrompt,
+            postReplyPrompt: configInput.postReplyPrompt,
+            commentReplyPrompt: configInput.commentReplyPrompt,
+          }, current.agents[0]),
+        ]
+      : []
+  }
+
+  const primaryAgent = nextAgents[0] ?? null
+  const testAgent = nextAgents.find((agent) => agent.enabled && agent.agentUserId) ?? primaryAgent
+  const resolvedAgentUser = testAgent?.agentUserId
     ? await prisma.user.findUnique({
-        where: { id: nextAgentUserId },
+        where: { id: testAgent.agentUserId },
         select: { id: true, username: true, nickname: true, status: true },
       })
     : null
@@ -223,15 +395,16 @@ export async function resolveAiReplyConfigDraftFromAdminInput(body: JsonObject) 
     enabled: normalizeBoolean(configInput.enabled, current.enabled),
     baseUrl: normalizeBaseUrl(configInput.baseUrl, current.baseUrl),
     model: normalizeOptionalString(configInput.model, current.model, 200),
-    agentUserId: nextAgentUserId,
-    respondToPostMentions: normalizeBoolean(configInput.respondToPostMentions, current.respondToPostMentions),
-    respondToCommentMentions: normalizeBoolean(configInput.respondToCommentMentions, current.respondToCommentMentions),
+    agentUserId: primaryAgent?.agentUserId ?? nextAgentUserId,
+    respondToPostMentions: primaryAgent?.respondToPostMentions ?? normalizeBoolean(configInput.respondToPostMentions, current.respondToPostMentions),
+    respondToCommentMentions: primaryAgent?.respondToCommentMentions ?? normalizeBoolean(configInput.respondToCommentMentions, current.respondToCommentMentions),
     temperature: normalizeTemperature(configInput.temperature, current.temperature),
     maxOutputTokens: clampPositiveInt(configInput.maxOutputTokens, current.maxOutputTokens, 64, 4_000),
     timeoutMs: clampNonNegativeInt(configInput.timeoutMs, current.timeoutMs, 5_000, 120_000),
-    systemPrompt: normalizeRequiredString(configInput.systemPrompt, current.systemPrompt, 4_000),
-    postReplyPrompt: normalizeRequiredString(configInput.postReplyPrompt, current.postReplyPrompt, 2_000),
-    commentReplyPrompt: normalizeRequiredString(configInput.commentReplyPrompt, current.commentReplyPrompt, 2_000),
+    systemPrompt: primaryAgent?.systemPrompt ?? normalizeRequiredString(configInput.systemPrompt, current.systemPrompt, 4_000),
+    postReplyPrompt: primaryAgent?.postReplyPrompt ?? normalizeRequiredString(configInput.postReplyPrompt, current.postReplyPrompt, 2_000),
+    commentReplyPrompt: primaryAgent?.commentReplyPrompt ?? normalizeRequiredString(configInput.commentReplyPrompt, current.commentReplyPrompt, 2_000),
+    agents: nextAgents,
     apiKey: current.apiKey,
   }
 

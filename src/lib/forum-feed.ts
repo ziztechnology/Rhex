@@ -13,6 +13,7 @@ import { resolvePostCoverImage } from "@/lib/post-cover"
 import { getPublicPostContentText } from "@/lib/post-content"
 import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
+import { getUserAvatarPath, getUserDisplayName } from "@/lib/user-display"
 import type { PostRewardPoolMode } from "@/lib/post-reward-pool-config"
 
 export type FeedSort = "latest" | "new" | "hot" | "weekly" | "following"
@@ -171,9 +172,9 @@ function mapFeedPost(post: FeedPostRecord | PinnedFeedPostRecord, anonymousMaskI
   const rewardPoolConfig = feedPost.redPacket ? parsePostRewardPoolConfigFromContent(feedPost.content) : null
   const maskedAuthor = applyAnonymousIdentityToPost({
     isAnonymous: Boolean(feedPost.isAnonymous),
-    author: feedPost.author.nickname ?? feedPost.author.username,
+    author: getUserDisplayName(feedPost.author),
     authorUsername: feedPost.author.username,
-    authorAvatarPath: feedPost.author.avatarPath,
+    authorAvatarPath: getUserAvatarPath(feedPost.author),
     authorStatus: feedPost.author.status ?? "ACTIVE",
     authorVipLevel: feedPost.author.vipLevel,
     authorIsVip: Boolean(feedPost.author.vipExpiresAt && new Date(feedPost.author.vipExpiresAt).getTime() > Date.now()),

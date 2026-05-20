@@ -3,6 +3,7 @@ import { CommentStatus, PostStatus, Prisma } from "@/db/types"
 import { prisma } from "@/db/client"
 import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import { getBusinessDayRange } from "@/lib/formatters"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export async function findHomeSidebarStats() {
   const [postCount, replyCount, userCount] = await Promise.all([
@@ -69,7 +70,7 @@ export async function findHomeSidebarHotTopics(limit: number) {
   const todayPosts = await prisma.post.findMany({
     where: {
       ...buildHomeVisiblePostWhere(),
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       activityAt: { gte: todayStart },
     },
     include: POST_INCLUDE,
@@ -88,7 +89,7 @@ export async function findHomeSidebarHotTopics(limit: number) {
   const historyPosts = await prisma.post.findMany({
     where: {
       ...buildHomeVisiblePostWhere(),
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       ...(todayIds.length > 0 ? { id: { notIn: todayIds } } : {}),
     },
     include: POST_INCLUDE,

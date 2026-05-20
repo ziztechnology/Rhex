@@ -1,6 +1,7 @@
 import type { Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 const RSS_POST_LIMIT = 30
 
@@ -48,7 +49,7 @@ function getRssPostOrderBy(): Prisma.PostOrderByWithRelationInput[] {
 export function findRssPosts(limit = RSS_POST_LIMIT) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
     },
     orderBy: getRssPostOrderBy(),
     take: limit,
@@ -59,7 +60,7 @@ export function findRssPosts(limit = RSS_POST_LIMIT) {
 export function findBoardRssPosts(boardSlug: string, limit = RSS_POST_LIMIT) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       board: {
         slug: boardSlug,
         status: "ACTIVE",
@@ -74,7 +75,7 @@ export function findBoardRssPosts(boardSlug: string, limit = RSS_POST_LIMIT) {
 export function findZoneRssPosts(zoneSlug: string, limit = RSS_POST_LIMIT) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       board: {
         status: "ACTIVE",
         zone: {
@@ -91,7 +92,7 @@ export function findZoneRssPosts(zoneSlug: string, limit = RSS_POST_LIMIT) {
 export function findUserRssPosts(username: string, limit = RSS_POST_LIMIT) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       isAnonymous: false,
       author: {
         username,
@@ -106,7 +107,7 @@ export function findUserRssPosts(username: string, limit = RSS_POST_LIMIT) {
 export function findTagRssPosts(tagSlug: string, limit = RSS_POST_LIMIT) {
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       tags: {
         some: {
           tag: {

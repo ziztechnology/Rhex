@@ -109,7 +109,7 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
     await writeAdminActionLog(context, adminPostActionHandlers["post.show"].metadata)
     return { message: "帖子已上线" }
   }),
-  "post.lock": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员关闭帖子" }, async (context) => {
+  "post.lock": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员关闭帖子回复" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     const previousStatus = post.status as AddonReadablePostStatus
     await updatePostStatus(context.targetId, PostStatus.LOCKED)
@@ -123,9 +123,9 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
       nextStatus: "LOCKED",
     })
     await writeAdminActionLog(context, adminPostActionHandlers["post.lock"].metadata)
-    return { message: "帖子已关闭" }
+    return { message: "帖子已关闭回复" }
   }),
-  "post.unlock": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员开放帖子" }, async (context) => {
+  "post.unlock": defineAdminAction({ targetType: "POST", revalidatePaths: ["/", "/admin"], buildDetail: () => "管理员开放帖子回复" }, async (context) => {
     const post = await ensureCanManagePost(context.actor, context.targetId)
     const previousStatus = post.status as AddonReadablePostStatus
     await updatePostStatus(context.targetId, PostStatus.NORMAL, null)
@@ -142,7 +142,7 @@ export const adminPostActionHandlers: Record<string, AdminActionDefinition> = {
       nextStatus: "NORMAL",
     })
     await writeAdminActionLog(context, adminPostActionHandlers["post.unlock"].metadata)
-    return { message: "帖子已开放" }
+    return { message: "帖子已开放回复" }
   }),
   "post.moveBoard": defineAdminAction({ targetType: "POST", buildDetail: () => "管理员移动帖子节点" }, async (context) => {
     const boardSlug = requireAdminActionString(context.body, "boardSlug", "缺少目标节点")

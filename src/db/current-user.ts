@@ -12,6 +12,7 @@ export const currentUserRecordSelect = {
   avatarPath: true,
   role: true,
   status: true,
+  statusExpiresAt: true,
   level: true,
   points: true,
   vipLevel: true,

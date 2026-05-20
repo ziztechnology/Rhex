@@ -2,13 +2,14 @@ import { UserRole, UserStatus } from "@/db/types"
 
 import { prisma } from "@/db/client"
 
-export function updateUserStatus(userId: number, status: UserStatus) {
+export function updateUserStatus(userId: number, status: UserStatus, statusExpiresAt?: Date | null) {
   const shouldInvalidateSessions = status === UserStatus.BANNED || status === UserStatus.INACTIVE
 
   return prisma.user.update({
     where: { id: userId },
     data: {
       status,
+      statusExpiresAt: status === UserStatus.MUTED || status === UserStatus.BANNED ? statusExpiresAt ?? null : null,
       ...(shouldInvalidateSessions ? { sessionInvalidBefore: new Date() } : {}),
     },
   })
@@ -20,6 +21,7 @@ export function updateUserRole(userId: number, role: UserRole, status?: UserStat
     data: {
       role,
       status,
+      ...(status ? { statusExpiresAt: null } : {}),
     },
   })
 }
@@ -91,7 +93,7 @@ export function findUserUsername(userId: number) {
 export function findUserStatus(userId: number) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true, status: true },
+    select: { role: true, status: true, statusExpiresAt: true },
   })
 }
 
@@ -126,6 +128,7 @@ export function promoteUserToAdmin(userId: number) {
       data: {
         role: UserRole.ADMIN,
         status: UserStatus.ACTIVE,
+        statusExpiresAt: null,
       },
     })
     await tx.moderatorZoneScope.deleteMany({ where: { moderatorId: userId } })

@@ -6,13 +6,19 @@ const rssPublicFeedSelect = {
   sourceId: true,
   title: true,
   author: true,
+  summary: true,
+  contentText: true,
   linkUrl: true,
   publishedAt: true,
   createdAt: true,
+  likeCount: true,
+  tipCount: true,
+  tipTotalPoints: true,
   source: {
     select: {
       id: true,
       siteName: true,
+      description: true,
       logoPath: true,
     },
   },
@@ -23,7 +29,9 @@ export type RssPublicFeedRecord = Prisma.RssEntryGetPayload<{ select: typeof rss
 const rssPublicSourceSelect = {
   id: true,
   siteName: true,
+  description: true,
   logoPath: true,
+  createdAt: true,
 } satisfies Prisma.RssSourceSelect
 
 export type RssPublicSourceRecord = Prisma.RssSourceGetPayload<{ select: typeof rssPublicSourceSelect }>
@@ -61,6 +69,24 @@ export function listPublicRssEntries(skip: number, take: number, sourceIds: stri
   })
 }
 
+export function listPublicRssEntryViewerLikes(entryIds: string[], userId?: number | null) {
+  if (!userId || entryIds.length === 0) {
+    return Promise.resolve([])
+  }
+
+  return prisma.rssEntryLike.findMany({
+    where: {
+      userId,
+      entryId: {
+        in: entryIds,
+      },
+    },
+    select: {
+      entryId: true,
+    },
+  })
+}
+
 export function listPublicRssSources() {
   return prisma.rssSource.findMany({
     where: {
@@ -75,5 +101,38 @@ export function listPublicRssSources() {
       { id: "asc" },
     ],
     select: rssPublicSourceSelect,
+  })
+}
+
+export function listAllPublicRssSources() {
+  return prisma.rssSource.findMany({
+    orderBy: [
+      { siteName: "asc" },
+      { id: "asc" },
+    ],
+    select: rssPublicSourceSelect,
+  })
+}
+
+export function countApprovedRssEntriesBySourceIds(sourceIds: string[]) {
+  if (sourceIds.length === 0) {
+    return Promise.resolve([])
+  }
+
+  return prisma.rssEntry.groupBy({
+    by: ["sourceId"],
+    where: {
+      sourceId: {
+        in: sourceIds,
+      },
+      reviewStatus: "APPROVED",
+    },
+    _count: {
+      _all: true,
+    },
+    _max: {
+      publishedAt: true,
+      createdAt: true,
+    },
   })
 }

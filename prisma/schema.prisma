@@ -354,6 +354,12 @@ enum RssEntryReviewStatus {
   REJECTED
 }
 
+enum RssSourceApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum FavoriteCollectionVisibility {
   PUBLIC
   PRIVATE
@@ -442,6 +448,7 @@ model User {
   gender                           String?
   role                             UserRole                       @default(USER)
   status                           UserStatus                     @default(ACTIVE)
+  statusExpiresAt                  DateTime?                      @db.Timestamptz(3)
   points                           Int                            @default(0)
   level                            Int                            @default(1)
   vipLevel                         Int                            @default(0)
@@ -464,6 +471,7 @@ model User {
   posts                            Post[]
   comments                         Comment[]                      @relation("commentAuthor")
   repliesReceived                  Comment[]                      @relation("replyToUser")
+  privateCommentsReceived          Comment[]                      @relation("privateCommentRecipient")
   lotteryParticipations            LotteryParticipant[]
   lotteryWins                      LotteryWinner[]
   notifications                    Notification[]                 @relation("notificationUser")
@@ -522,6 +530,10 @@ model User {
   reviewedVerifications            UserVerification[]             @relation("userVerificationReviewer")
   reviewedComments                 Comment[]                      @relation("commentReviewer")
   rssReviewedEntries               RssEntry[]                     @relation("rssEntryReviewer")
+  rssEntryLikes                    RssEntryLike[]
+  rssEntryTips                     RssEntryTip[]                  @relation("RssEntryTipSender")
+  rssSourceApplications            RssSourceApplication[]         @relation("rssSourceApplicationApplicant")
+  rssSourceApplicationsReviewed    RssSourceApplication[]         @relation("rssSourceApplicationReviewer")
   yinYangChallengesCreated         YinYangChallenge[]             @relation("YinYangChallengeCreator")
   yinYangChallengesJoined          YinYangChallenge[]             @relation("YinYangChallengeChallenger")
   yinYangChallengeAttempts         YinYangChallengeAttempt[]
@@ -542,6 +554,7 @@ model User {
 
   @@index([role])
   @@index([status])
+  @@index([status, statusExpiresAt])
   @@index([createdAt])
   @@index([inviterId])
 }
@@ -1065,6 +1078,7 @@ model Comment {
   parentId              String?
   replyToUserId         Int?
   replyToCommentId      String?
+  privateRecipientUserId Int?
   useAnonymousIdentity  Boolean                @default(false)
   content               String
   status                CommentStatus          @default(NORMAL)
@@ -1086,6 +1100,7 @@ model Comment {
   replies               Comment[]              @relation("CommentReplies")
   replyToUser           User?                  @relation("replyToUser", fields: [replyToUserId], references: [id])
   replyToComment        Comment?               @relation("CommentReplyTargets", fields: [replyToCommentId], references: [id], onDelete: SetNull)
+  privateRecipient      User?                  @relation("privateCommentRecipient", fields: [privateRecipientUserId], references: [id], onDelete: SetNull)
   quotedReplies         Comment[]              @relation("CommentReplyTargets")
   reviewer              User?                  @relation("commentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   likes                 Like[]
@@ -1102,6 +1117,7 @@ model Comment {
   @@index([userId])
   @@index([parentId])
   @@index([replyToCommentId])
+  @@index([privateRecipientUserId])
   @@index([postId, status, createdAt])
   @@index([postId, status, parentId, createdAt])
   @@index([postId, status, parentId, isPinnedByAuthor, createdAt, id], map: "comment_thread_order_idx")
@@ -1800,6 +1816,7 @@ model RssSetting {
 model RssSource {
   id               String     @id @default(cuid())
   siteName         String
+  description      String?
   feedUrl          String     @unique
   logoPath         String?
   intervalMinutes  Int
@@ -1809,6 +1826,7 @@ model RssSource {
   createdAt        DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime   @updatedAt @db.Timestamptz(3)
   entries          RssEntry[]
+  applications     RssSourceApplication[]
 
   @@index([createdAt])
   @@map("rss_source")
@@ -1829,12 +1847,17 @@ model RssEntry {
   reviewNote   String?
   reviewedById Int?
   reviewedAt   DateTime?            @db.Timestamptz(3)
+  likeCount     Int                  @default(0)
+  tipCount      Int                  @default(0)
+  tipTotalPoints Int                 @default(0)
   dedupeKey    String
   rawJson      Json
   createdAt    DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime             @updatedAt @db.Timestamptz(3)
   source       RssSource            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   reviewer     User?                @relation("rssEntryReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  likes        RssEntryLike[]
+  tips         RssEntryTip[]
 
   @@unique([sourceId, dedupeKey])
   @@index([sourceId, publishedAt])
@@ -1842,6 +1865,62 @@ model RssEntry {
   @@index([reviewStatus, createdAt])
   @@index([reviewedById, reviewedAt])
   @@map("rss_entry")
+}
+
+model RssEntryLike {
+  id        String   @id @default(cuid())
+  entryId   String
+  userId    Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  entry     RssEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, userId])
+  @@index([entryId, createdAt])
+  @@index([userId, createdAt])
+  @@map("rss_entry_like")
+}
+
+model RssEntryTip {
+  id               String   @id @default(cuid())
+  entryId          String
+  senderId         Int
+  amount           Int
+  giftId           String?
+  giftNameSnapshot String?
+  giftIconSnapshot String?
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  entry            RssEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  sender           User     @relation("RssEntryTipSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([entryId, senderId, createdAt])
+  @@map("rss_entry_tip")
+}
+
+model RssSourceApplication {
+  id           String                     @id @default(cuid())
+  applicantId  Int
+  siteName     String
+  description  String?
+  feedUrl      String
+  status       RssSourceApplicationStatus @default(PENDING)
+  reviewNote   String?
+  reviewedById Int?
+  reviewedAt   DateTime?                  @db.Timestamptz(3)
+  sourceId     String?
+  createdAt    DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime                   @updatedAt @db.Timestamptz(3)
+  applicant    User                       @relation("rssSourceApplicationApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  reviewer     User?                      @relation("rssSourceApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  source       RssSource?                 @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([applicantId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([reviewedById, reviewedAt])
+  @@index([sourceId])
+  @@map("rss_source_application")
 }
 
 model AddonRegistry {

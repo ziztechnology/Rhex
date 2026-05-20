@@ -6,9 +6,10 @@ import { Copy, Ellipsis, Eye, Flag } from "lucide-react"
 import { FollowToggleButton } from "@/components/follow-toggle-button"
 import { ReportDialog } from "@/components/post/report-dialog"
 import { Button } from "@/components/ui/button"
+import { toast } from "@/components/ui/toast"
+import { copyTextToClipboard } from "@/lib/clipboard"
 import { getPostPath } from "@/lib/post-links"
 import type { PostLinkDisplayMode } from "@/lib/site-settings"
-import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
 
 interface PostBodyCopyMenuProps {
@@ -41,13 +42,12 @@ export function PostBodyCopyMenu({ post, postLinkDisplayMode = "SLUG", canReport
   }, [copyPath])
 
   async function handleCopyLink() {
-    try {
-      await navigator.clipboard.writeText(copyLink)
+    if (await copyTextToClipboard(copyLink)) {
       toast.success("已复制帖子链接", "复制成功")
       setIsMenuOpen(false)
-    } catch {
-      toast.error("复制失败，请手动复制", "复制失败")
+      return
     }
+    toast.error("复制失败，请手动复制", "复制失败")
   }
 
   function isProfilePreviewTrigger(target: EventTarget | null) {

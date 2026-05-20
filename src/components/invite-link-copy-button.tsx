@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react"
 
 import { Button } from "@/components/ui/rbutton"
 import { toast } from "@/components/ui/toast"
+import { copyTextToClipboard } from "@/lib/clipboard"
 
 interface InviteLinkCopyButtonProps {
   path: string
@@ -24,11 +25,14 @@ export function InviteLinkCopyButton({ path }: InviteLinkCopyButtonProps) {
   async function handleCopy() {
     try {
       const copyValue = origin ? link : new URL(path, window.location.origin).toString()
-      await navigator.clipboard.writeText(copyValue)
-      toast.success("已复制邀请链接", "复制成功")
+      if (await copyTextToClipboard(copyValue)) {
+        toast.success("已复制邀请链接", "复制成功")
+        return
+      }
     } catch {
-      toast.error("复制失败，请手动复制", "复制失败")
+      // Fall through to the shared failure toast.
     }
+    toast.error("复制失败，请手动复制", "复制失败")
   }
 
   return (

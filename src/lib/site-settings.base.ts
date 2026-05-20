@@ -48,6 +48,7 @@ export interface SiteSettingsBaseData {
   footerLinks: FooterLinkItem[]
   headerAppLinks: SiteHeaderAppLinkItem[]
   headerAppIconName: string
+  topHeaderAppLinks: SiteHeaderAppLinkItem[]
   messageEnabled: boolean
   theme: ThemeRuntimeSettings
   search: SiteSearchSettings

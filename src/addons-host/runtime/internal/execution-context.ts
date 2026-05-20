@@ -1,7 +1,7 @@
 /**
  * @file execution-context.ts
  * @responsibility buildAddonExecutionContext —— 为 addon 执行态注入各 Facade
- *   (posts/comments/messages/notifications/follows/points/config/secrets/data 等)
+ *   (posts/comments/messages/notifications/emails/follows/points/config/secrets/data 等)
  * @scope Phase B.7 抽出自 runtime/loader.ts L501-L852；各 Facade 实现已在 runtime/{posts,comments,...}.ts
  * @depends-on ../fs, ../config, ../secrets, ../permissions, ../background-jobs,
  *             @/lib/auth, @/lib/site-settings, @/lib/background-job-scheduler,

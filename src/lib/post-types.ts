@@ -1,8 +1,10 @@
 import type { PostStatus } from "@/db/types"
 
 export const POST_TYPES = ["NORMAL", "BOUNTY", "POLL", "LOTTERY", "AUCTION"] as const
+export const PUBLIC_READABLE_POST_STATUSES = ["NORMAL", "LOCKED"] as const
 
 export type LocalPostType = (typeof POST_TYPES)[number]
+export type PublicReadablePostStatus = (typeof PUBLIC_READABLE_POST_STATUSES)[number]
 
 export const DEFAULT_POST_TYPE: LocalPostType = "NORMAL"
 export const DEFAULT_ALLOWED_POST_TYPES: LocalPostType[] = [...POST_TYPES]
@@ -62,11 +64,19 @@ export function getPostStatusLabel(status: PostStatus | string) {
     case "OFFLINE":
       return "已下线"
     case "LOCKED":
-      return "已锁定"
+      return "已关闭回复"
     case "NORMAL":
     default:
       return "正常"
   }
+}
+
+export function isPublicReadablePostStatus(status: PostStatus | string | null | undefined): status is PublicReadablePostStatus {
+  return status === "NORMAL" || status === "LOCKED"
+}
+
+export function isPostOpenForReplies(status: PostStatus | string | null | undefined) {
+  return status === "NORMAL"
 }
 
 export function shouldPostBePending(postType: LocalPostType | string) {

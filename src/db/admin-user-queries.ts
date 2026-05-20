@@ -3,8 +3,11 @@ import { UserRole, UserStatus } from "@/db/types"
 import type { Prisma } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { clearExpiredUserRestrictions } from "@/db/user-status-queries"
 
 export async function buildAdminUserSummary(where: Prisma.UserWhereInput, now: Date) {
+  await clearExpiredUserRestrictions(now)
+
   const [total, groupedRows, vip] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.groupBy({

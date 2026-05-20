@@ -20,6 +20,7 @@ import type {
 
 type SourceDraft = {
   siteName: string
+  description: string
   feedUrl: string
   logoPath: string
   intervalMinutes: string
@@ -55,6 +56,7 @@ interface RssHarvestAdminPageProps {
 function createEmptySourceDraft(): SourceDraft {
   return {
     siteName: "",
+    description: "",
     feedUrl: "",
     logoPath: "",
     intervalMinutes: "30",
@@ -310,6 +312,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
   function syncDraftFromSource(source: SourceItem) {
     setDraft({
       siteName: source.siteName,
+      description: source.description ?? "",
       feedUrl: source.feedUrl,
       logoPath: source.logoPath ?? "",
       intervalMinutes: String(source.intervalMinutes),
@@ -400,6 +403,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
           sourceId: editingId,
           source: {
             siteName: draft.siteName,
+            description: draft.description,
             feedUrl: draft.feedUrl,
             logoPath: draft.logoPath,
             intervalMinutes: Number(draft.intervalMinutes || 0),
@@ -674,6 +678,20 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
         </div>
       </section>
 
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-semibold">用户收录申请</h4>
+            <p className="mt-1 text-sm text-muted-foreground">用户提交的 RSS 源申请已移到独立审核页，支持筛选、分页和审核备注。</p>
+          </div>
+          <Link href="/admin/apps/rss-harvest/applications">
+            <Button type="button" variant={data.pendingSourceApplicationCount > 0 ? "default" : "outline"}>
+              收录申请{data.pendingSourceApplicationCount > 0 ? ` ${data.pendingSourceApplicationCount}` : ""}
+            </Button>
+          </Link>
+        </div>
+      </section>
+
       <section className="space-y-4 rounded-xl border border-border bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -699,6 +717,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
                     <span className="text-xs text-muted-foreground">每 {source.intervalMinutes} 分钟抓取一次</span>
                   </div>
                   <p className="mt-2 break-all text-sm font-medium text-foreground">{source.feedUrl}</p>
+                  {source.description ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{source.description}</p> : null}
                   <p className="mt-1 text-xs text-muted-foreground">
                     下次执行 {source.nextRunAt ? formatDateTime(source.nextRunAt) : "未安排"} · 最近成功 {source.lastSuccessAt ? formatDateTime(source.lastSuccessAt) : "暂无"} · 连续失败 {source.failureCount}
                   </p>
@@ -814,6 +833,7 @@ export function RssHarvestAdminPage({ initialData }: RssHarvestAdminPageProps) {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="站点名称" value={draft.siteName} onChange={(value) => setDraft((current) => ({ ...current, siteName: value }))} />
+          <Field label="站点描述" value={draft.description} onChange={(value) => setDraft((current) => ({ ...current, description: value }))} />
           <div className="md:col-span-2 md:flex md:items-end md:gap-3">
             <Field label="RSS 地址" value={draft.feedUrl} onChange={(value) => setDraft((current) => ({ ...current, feedUrl: value }))} className="md:flex-1" type="url" />
             <Button type="button" variant="outline" className="mt-2 h-11 rounded-[16px] px-4 md:mt-0" disabled={isPending} onClick={testSourceFeed}>

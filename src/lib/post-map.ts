@@ -9,6 +9,7 @@ import { resolvePostCoverImage } from "@/lib/post-cover"
 import { parsePostRewardPoolConfigFromContent } from "@/lib/post-red-packets"
 import { getPostStatusLabel, getPostTypeLabel, type LocalPostType } from "@/lib/post-types"
 import { getUserDisplayName, type PublicUserStatus } from "@/lib/users"
+import { getUserAvatarPath } from "@/lib/user-display"
 import { getVipLevel, isVipActive, type VipStateSource } from "@/lib/vip-status"
 
 
@@ -135,7 +136,7 @@ export function mapListPost(post: ListPostSource, anonymousMaskIdentity: Anonymo
     authorId: post.author.id,
 
     authorUsername: post.author.username,
-    authorAvatarPath: post.author.avatarPath,
+    authorAvatarPath: getUserAvatarPath(post.author),
     authorStatus: post.author.status,
     authorIsVip: isVipActive(post.author),
 

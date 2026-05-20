@@ -47,6 +47,10 @@ export interface RefinedRichPostEditorProps {
   markdownEmojiMap?: MarkdownEmojiItem[]
   markdownImageUploadEnabled?: boolean
   shellClassName?: string
+  privateReplyPostId?: string
+  privateReplyRecipient?: PrivateReplyRecipient | null
+  onPrivateReplyInsert?: (payload: PrivateReplyInsertPayload) => void
+  onClearPrivateReply?: () => void
 }
 
 export type MediaInsertResult = {
@@ -71,4 +75,17 @@ export type ToolbarTipDefinition = {
   label: string
   shortcuts?: PlatformShortcutMap
   description?: string
+}
+
+export type PrivateReplyRecipient = {
+  id: number
+  username: string
+  displayName: string
+  role?: "USER" | "MODERATOR" | "ADMIN"
+  isPostAuthor?: boolean
+}
+
+export type PrivateReplyInsertPayload = {
+  recipient: PrivateReplyRecipient
+  content: string
 }

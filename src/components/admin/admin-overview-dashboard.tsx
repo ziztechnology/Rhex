@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Megaphone,
   MessageSquare,
+  Rss,
   Shield,
   TrendingUp,
   Users,
@@ -42,6 +43,7 @@ import {
 import { Tooltip } from "@/components/ui/tooltip"
 import type { AdminDashboardData } from "@/lib/admin-dashboard"
 import { getAdminSettingsHref } from "@/lib/admin-settings-navigation"
+import { getAvatarFallback } from "@/lib/avatar"
 import { formatMonthDayTime, formatNumber } from "@/lib/formatters"
 import { getCanonicalPostPath } from "@/lib/post-links"
 import { cn } from "@/lib/utils"
@@ -243,7 +245,7 @@ export function AdminOverviewDashboard({
             <CardTitle>运营待办</CardTitle>
             <CardDescription>优先处理高影响的审核与处置任务。</CardDescription>
             <CardAction>
-              <Badge variant="secondary">7 项待看</Badge>
+              <Badge variant="secondary">8 项待看</Badge>
             </CardAction>
           </CardHeader>
           <CardContent className="grid gap-3 py-4 sm:grid-cols-2">
@@ -267,6 +269,13 @@ export function AdminOverviewDashboard({
               value={data.overview.pendingFriendLinkCount}
               description="审核站点互链申请与展示资料"
               icon={<Shield className="h-3.5 w-3.5" />}
+            />
+            <PendingReviewCard
+              href="/admin/apps/rss-harvest/applications"
+              title="RSS 源审核"
+              value={data.overview.pendingRssSourceApplicationCount}
+              description="审核用户提交的 RSS 博客收录申请"
+              icon={<Rss className="h-3.5 w-3.5" />}
             />
             <PendingReviewCard
               href="/admin/apps/self-serve-ads"
@@ -971,9 +980,7 @@ function OverviewSectionActionLink({
 }
 
 function getInitials(name: string) {
-  const normalized = name.trim()
-
-  return normalized.slice(0, 2).toUpperCase() || "NA"
+  return getAvatarFallback(name)
 }
 
 function getOverviewMetricBadgeClassName(
@@ -996,6 +1003,10 @@ function getPostStatusBadgeClassName(status: string) {
 
   if (status === "OFFLINE") {
     return "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-200"
+  }
+
+  if (status === "LOCKED") {
+    return "border-transparent bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200"
   }
 
   return "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200"

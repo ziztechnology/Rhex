@@ -14,6 +14,7 @@ import {
 } from "@/db/lottery-queries"
 import { apiError } from "@/lib/api-route"
 import { canSendEmail } from "@/lib/mailer"
+import { isPublicReadablePostStatus } from "@/lib/post-types"
 
 
 import { formatDateTime, parseBusinessDateTime } from "@/lib/formatters"
@@ -784,7 +785,7 @@ export async function getLotteryParticipantList(
     },
   })
 
-  if (!post || post.type !== "LOTTERY" || post.status !== "NORMAL") {
+  if (!post || post.type !== "LOTTERY" || !isPublicReadablePostStatus(post.status)) {
     return null
   }
 

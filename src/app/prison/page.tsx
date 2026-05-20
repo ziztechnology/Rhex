@@ -11,6 +11,7 @@ import { UserAvatar } from "@/components/user/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { prisma } from "@/db/client"
+import { clearExpiredUserRestrictions } from "@/db/user-status-queries"
 import { UserStatus } from "@/db/types"
 import { getCurrentUser } from "@/lib/auth"
 import { getBoards } from "@/lib/boards"
@@ -19,6 +20,7 @@ import { getHomeAnnouncements } from "@/lib/announcements"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
+import { getUserAvatarPath, getUserDisplayName } from "@/lib/user-display"
 import { cn } from "@/lib/utils"
 import { getZones } from "@/lib/zones"
 
@@ -159,6 +161,7 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
   const searchParams = await props.searchParams
   const activeStatus = normalizeStatusFilter(readSearchParam(searchParams?.status))
   const requestedPage = normalizePage(readSearchParam(searchParams?.page))
+  await clearExpiredUserRestrictions()
   const where = activeStatus === "ALL"
     ? { status: { in: [UserStatus.BANNED, UserStatus.MUTED] } }
     : { status: activeStatus === "BANNED" ? UserStatus.BANNED : UserStatus.MUTED }
@@ -223,7 +226,8 @@ export default async function PrisonPage(props: PageProps<"/prison">) {
 
     return {
       ...user,
-      displayName: user.nickname ?? user.username,
+      displayName: getUserDisplayName(user),
+      avatarPath: getUserAvatarPath(user),
       statusMeta,
       moderationAt: moderationLog?.createdAt ?? user.updatedAt,
       reason: resolveModerationReason(moderationLog?.detail, statusMeta.fallbackReason),

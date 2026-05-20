@@ -140,6 +140,7 @@ async function getAdminDashboardRawDataUncached() {
       pendingBoardApplicationCount: NumericLike
       pendingVerificationCount: NumericLike
       pendingFriendLinkCount: NumericLike
+      pendingRssSourceApplicationCount: NumericLike
       totalFollowerCount: NumericLike
       todayCheckInUserCount: NumericLike
     }>>(Prisma.sql`
@@ -149,6 +150,7 @@ async function getAdminDashboardRawDataUncached() {
         (SELECT COUNT(*) FROM "BoardApplication" WHERE status = 'PENDING') AS "pendingBoardApplicationCount",
         (SELECT COUNT(*) FROM "UserVerification" WHERE status = 'PENDING') AS "pendingVerificationCount",
         (SELECT COUNT(*) FROM "FriendLink" WHERE status = 'PENDING') AS "pendingFriendLinkCount",
+        (SELECT COUNT(*) FROM "rss_source_application" WHERE status = 'PENDING') AS "pendingRssSourceApplicationCount",
         (SELECT COALESCE(SUM("followerCount"), 0) FROM "Board") AS "totalFollowerCount",
         (SELECT COUNT(*) FROM "UserCheckInLog" WHERE "checkedInOn" = ${todayKey}) AS "todayCheckInUserCount"
     `),
@@ -211,6 +213,7 @@ async function getAdminDashboardRawDataUncached() {
       pendingBoardApplicationCount: toNumber(resolvedSiteStats?.pendingBoardApplicationCount),
       pendingVerificationCount: toNumber(resolvedSiteStats?.pendingVerificationCount),
       pendingFriendLinkCount: toNumber(resolvedSiteStats?.pendingFriendLinkCount),
+      pendingRssSourceApplicationCount: toNumber(resolvedSiteStats?.pendingRssSourceApplicationCount),
       pendingAdOrderCount,
       activeUserCount7d: toNumber(resolvedUserStats?.activeUserCount7d),
       mutedUserCount: toNumber(resolvedUserStats?.mutedUserCount),

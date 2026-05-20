@@ -41,6 +41,7 @@ function createInitialPermissionsState(user: AdminUserListItem): PermissionsForm
 function createInitialAccountState(): AccountFormState {
   return {
     statusMessage: "",
+    statusExpiresAtDraft: "",
     statusFeedback: "",
     newPassword: "",
     confirmPassword: "",
@@ -327,11 +328,14 @@ export function useUserActions({
         action,
         targetId: String(user.id),
         message: accountState.statusMessage,
+        statusExpiresAt: accountState.statusExpiresAtDraft || null,
+        statusExpiresAtTimezoneOffsetMinutes: accountState.statusExpiresAtDraft ? new Date().getTimezoneOffset() : null,
       })
 
       setAccountState((current) => ({
         ...current,
         statusMessage: result.ok ? "" : current.statusMessage,
+        statusExpiresAtDraft: result.ok ? "" : current.statusExpiresAtDraft,
         statusFeedback: result.message,
       }))
       if (result.ok) {
@@ -554,6 +558,9 @@ export function useUserActions({
       state: accountState,
       setStatusMessage: (value: string) => {
         setAccountState((current) => ({ ...current, statusMessage: value }))
+      },
+      setStatusExpiresAtDraft: (value: string) => {
+        setAccountState((current) => ({ ...current, statusExpiresAtDraft: value }))
       },
       runStatusAction,
       setNewPassword: (value: string) => {

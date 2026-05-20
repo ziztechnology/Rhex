@@ -1,6 +1,7 @@
 import { UserStatus } from "@/db/types"
 
 import { prisma } from "@/db/client"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export function findActiveBoardsWithZoneAndPostCount() {
   return prisma.board.findMany({
@@ -13,7 +14,7 @@ export function findActiveBoardsWithZoneAndPostCount() {
         select: {
           posts: {
             where: {
-              status: "NORMAL",
+              status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
             },
           },
         },
@@ -32,7 +33,7 @@ export function findBoardBySlugWithZoneAndPostCount(slug: string) {
         select: {
           posts: {
             where: {
-              status: "NORMAL",
+              status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
             },
           },
         },

@@ -423,6 +423,11 @@ function UserStatusCell({ user }: { user: AdminUserListItem }) {
         <p className="mt-1">
           {user.vipExpiresAt ? `到期 ${formatDateTime(user.vipExpiresAt)}` : "长期 / 无"}
         </p>
+        {user.status === "MUTED" || user.status === "BANNED" ? (
+          <p className="mt-1">
+            {user.statusExpiresAt ? `自动解除 ${formatDateTime(user.statusExpiresAt)}` : "永久限制"}
+          </p>
+        ) : null}
       </div>
     </div>
   )

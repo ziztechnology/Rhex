@@ -1517,6 +1517,11 @@
   html {
     @apply font-sans;
   }
+  button,
+  a[data-slot='dropdown-menu-item'],
+  button[data-slot='button'] {
+    cursor: pointer;
+  }
   @supports (-webkit-touch-callout: none) {
     @media (max-width: 767px) {
       input:not([type]),

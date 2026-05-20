@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Suspense } from "react"
 
 import { HeaderUserActions } from "@/components/header-user-actions"
+import { HeaderTopAppNavigation } from "@/components/header-top-app-navigation"
 import { MobileHeaderQuickActions } from "@/components/mobile-header-quick-actions"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { getBoards } from "@/lib/boards"
@@ -88,6 +89,7 @@ export async function SiteHeader() {
 
               <div className="ml-auto flex h-14 items-center gap-1.5">
                 <AddonSlotRenderer slot="layout.header.right" props={{ settings }} />
+                <HeaderTopAppNavigation links={settings.topHeaderAppLinks} />
                 <ThemeToggle />
                 <HeaderUserActions messageEnabled={settings.messageEnabled} />
               </div>

@@ -9,6 +9,7 @@ export interface HookableUserPresentationKeyInput {
   displayName: string
   avatarPath?: string | null
   role?: string | null
+  status?: string | null
   badges?: readonly HookableUserBadge[] | null
 }
 
@@ -43,6 +44,7 @@ export function buildHookableUserPresentationKey(
     input.displayName.trim(),
     input.avatarPath?.trim() || null,
     input.role?.trim() || null,
+    input.status?.trim() || null,
     collectHookableBadgeCodes(input.badges),
   ])
 }

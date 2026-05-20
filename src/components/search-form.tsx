@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Search } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type CSSProperties } from "react"
 
 import { ExternalSearchOptions } from "@/components/external-search-options"
 import { LevelIcon } from "@/components/level-icon"
@@ -151,6 +151,15 @@ export function SearchForm({
                     <div className="grid gap-1">
                       {appLinks.map((item) => {
                         const isExternal = /^https?:\/\//i.test(item.href)
+                        const hasIcon = item.icon.trim().length > 0
+                        const linkStyle: CSSProperties = {
+                          ...(item.textColor ? { color: item.textColor } : {}),
+                          ...(item.bold ? { fontWeight: 700 } : {}),
+                          ...(item.fontSizePx ? { fontSize: `${item.fontSizePx}px` } : {}),
+                        }
+                        const iconStyle: CSSProperties = {
+                          color: item.iconColor || item.textColor || "currentColor",
+                        }
 
 
                         return (
@@ -160,11 +169,14 @@ export function SearchForm({
                             target={isExternal ? "_blank" : undefined}
                             rel={isExternal ? "noreferrer noopener" : undefined}
                             className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-accent"
+                            style={linkStyle}
                             onClick={() => setDesktopAppsMenuOpen(false)}
                           >
-                            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                              <LevelIcon icon={item.icon} className="h-4 w-4 text-sm" emojiClassName="text-inherit" svgClassName="[&>svg]:block" title={item.name} />
-                            </span>
+                            {hasIcon ? (
+                              <span className="flex size-8 items-center justify-center rounded-xl bg-muted text-muted-foreground" style={iconStyle}>
+                                <LevelIcon icon={item.icon} className="size-4 text-sm" emojiClassName="text-inherit" svgClassName="[&>svg]:block" title={item.name} />
+                              </span>
+                            ) : null}
 
                             <span className="min-w-0 flex-1 truncate">{item.name}</span>
                           </Link>

@@ -27,6 +27,12 @@ export interface SiteHeaderAppLinkItem {
   name: string
   href: string
   icon: string
+  textColor?: string
+  iconColor?: string
+  activeTextColor?: string
+  activeBackgroundColor?: string
+  bold?: boolean
+  fontSizePx?: string
 }
 
 export const DEFAULT_SITE_HEADER_APP_LINKS: SiteHeaderAppLinkItem[] = [
@@ -76,9 +82,12 @@ const HEADER_APP_LINK_ICON_PALETTE: LucideIcon[] = [
   Link2,
 ]
 
-export function normalizeSiteHeaderAppLinks(raw: unknown): SiteHeaderAppLinkItem[] {
+const SITE_SETTINGS_STATE_KEY = "__siteSettings"
+const TOP_HEADER_APP_LINKS_STATE_KEY = "topHeaderAppLinks"
+
+function normalizeAppLinks(raw: unknown, fallback: SiteHeaderAppLinkItem[]): SiteHeaderAppLinkItem[] {
   if (!Array.isArray(raw)) {
-    return [...DEFAULT_SITE_HEADER_APP_LINKS]
+    return [...fallback]
   }
 
   const normalized: SiteHeaderAppLinkItem[] = []
@@ -88,7 +97,7 @@ export function normalizeSiteHeaderAppLinks(raw: unknown): SiteHeaderAppLinkItem
     const href = String(item?.href ?? "").trim()
     const icon = String(item?.icon ?? "⭐").trim()
 
-    if (!name || !href || !icon) {
+    if (!name || !href) {
       return
     }
 
@@ -97,10 +106,44 @@ export function normalizeSiteHeaderAppLinks(raw: unknown): SiteHeaderAppLinkItem
       name,
       href,
       icon,
+      textColor: normalizeOptionalHexColor(item?.textColor),
+      iconColor: normalizeOptionalHexColor(item?.iconColor),
+      activeTextColor: normalizeOptionalHexColor(item?.activeTextColor),
+      activeBackgroundColor: normalizeOptionalHexColor(item?.activeBackgroundColor),
+      bold: Boolean(item?.bold),
+      fontSizePx: normalizeOptionalPixelValue(item?.fontSizePx, 10, 24),
     })
   })
 
-  return normalized.length > 0 ? normalized : [...DEFAULT_SITE_HEADER_APP_LINKS]
+  return normalized.length > 0 ? normalized : [...fallback]
+}
+
+function normalizeOptionalHexColor(value: unknown) {
+  const normalized = String(value ?? "").trim()
+  return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized : undefined
+}
+
+function normalizeOptionalPixelValue(value: unknown, min: number, max: number) {
+  const normalized = String(value ?? "").trim()
+  if (!normalized) {
+    return undefined
+  }
+
+  const numericValue = Number(normalized)
+  if (!Number.isFinite(numericValue)) {
+    return undefined
+  }
+
+  const boundedValue = Math.min(max, Math.max(min, Math.round(numericValue)))
+  return String(boundedValue)
+}
+
+export function normalizeSiteHeaderAppLinks(raw: unknown): SiteHeaderAppLinkItem[] {
+  return normalizeAppLinks(raw, DEFAULT_SITE_HEADER_APP_LINKS)
+}
+
+export function normalizeTopHeaderAppLinks(raw: unknown): SiteHeaderAppLinkItem[] {
+  return normalizeAppLinks(raw, [])
 }
 
 
@@ -114,6 +157,48 @@ export function parseSiteHeaderAppLinks(raw: string | null | undefined) {
   } catch {
     return [...DEFAULT_SITE_HEADER_APP_LINKS]
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function parseAppStateRoot(raw: string | null | undefined) {
+  if (!raw) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return isRecord(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function readSiteSettingsState(raw: string | null | undefined) {
+  const root = parseAppStateRoot(raw)
+  const siteSettingsState = root[SITE_SETTINGS_STATE_KEY]
+  return isRecord(siteSettingsState) ? siteSettingsState : {}
+}
+
+function writeSiteSettingsState(appStateJson: string | null | undefined, nextState: Record<string, unknown>) {
+  const root = parseAppStateRoot(appStateJson)
+  root[SITE_SETTINGS_STATE_KEY] = nextState
+  return JSON.stringify(root)
+}
+
+export function resolveTopHeaderAppLinks(appStateJson: string | null | undefined) {
+  const state = readSiteSettingsState(appStateJson)
+  return normalizeTopHeaderAppLinks(state[TOP_HEADER_APP_LINKS_STATE_KEY])
+}
+
+export function mergeTopHeaderAppLinks(appStateJson: string | null | undefined, links: unknown) {
+  const state = readSiteSettingsState(appStateJson)
+  return writeSiteSettingsState(appStateJson, {
+    ...state,
+    [TOP_HEADER_APP_LINKS_STATE_KEY]: normalizeTopHeaderAppLinks(links),
+  })
 }
 
 export function normalizeHeaderAppIconName(raw: unknown): HeaderAppIconName {

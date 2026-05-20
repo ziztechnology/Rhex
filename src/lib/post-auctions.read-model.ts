@@ -13,6 +13,7 @@ import {
   getPostAuctionModeLabel,
   getPostAuctionPricingRuleLabel,
 } from "@/lib/post-auction-types"
+import { isPublicReadablePostStatus } from "@/lib/post-types"
 
 async function readAuctionForSummary(postId: string) {
   return prisma.postAuction.findUnique({
@@ -117,6 +118,7 @@ export async function getPostAuctionSummary(
 
   const participantPreviews = participantEntries.map((entry) => ({
     userId: entry.userId,
+    username: entry.user.username,
     userName: getUserDisplayName(entry.user) ?? "匿名用户",
     avatarPath: entry.user.avatarPath ?? null,
     isVip: Boolean(
@@ -217,7 +219,7 @@ export async function getPostAuctionBidRecordPage(
   if (
     !auction
     || auction.mode !== PostAuctionMode.OPEN_ASCENDING
-    || auction.post.status !== "NORMAL"
+    || !isPublicReadablePostStatus(auction.post.status)
   ) {
     return null
   }
@@ -285,7 +287,7 @@ export async function getPostAuctionParticipantPage(
     },
   })
 
-  if (!auction || auction.post.status !== "NORMAL") {
+  if (!auction || !isPublicReadablePostStatus(auction.post.status)) {
     return null
   }
 
@@ -330,6 +332,7 @@ export async function getPostAuctionParticipantPage(
     items: entries.map((entry) => ({
       id: entry.id,
       userId: entry.userId,
+      username: entry.user.username,
       userName: getUserDisplayName(entry.user) ?? "匿名用户",
       createdAt: (
         auction.mode === PostAuctionMode.OPEN_ASCENDING

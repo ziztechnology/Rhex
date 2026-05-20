@@ -1,4 +1,5 @@
 import { apiSuccess, createRouteHandler } from "@/lib/api-route"
+import { getSessionActorFromRequest } from "@/lib/auth"
 import { getRssHomeDisplaySettings } from "@/lib/rss-harvest"
 import { getRssUniverseFeedPage } from "@/lib/rss-public-feed"
 
@@ -22,8 +23,11 @@ function parseSourceIds(request: Request) {
 export const GET = createRouteHandler(async ({ request }) => {
   const page = parsePage(request)
   const sourceIds = parseSourceIds(request)
-  const settings = await getRssHomeDisplaySettings()
-  const data = await getRssUniverseFeedPage(page, settings.homePageSize, sourceIds)
+  const [settings, currentUser] = await Promise.all([
+    getRssHomeDisplaySettings(),
+    getSessionActorFromRequest(request),
+  ])
+  const data = await getRssUniverseFeedPage(page, settings.homePageSize, sourceIds, currentUser?.id)
 
   return apiSuccess(data)
 }, {

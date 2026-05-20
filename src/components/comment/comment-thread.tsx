@@ -457,6 +457,11 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
     setIsReplyBoxFollowing(false)
   }, [])
 
+  const finishTargetedReply = useCallback(() => {
+    setReplyTarget(null)
+    disableReplyBox()
+  }, [disableReplyBox])
+
   const toggleReplyBox = useCallback(() => {
     setIsReplyBoxPinned((current) => {
       const next = !current
@@ -1119,6 +1124,7 @@ export function CommentThread({ threadId, comments, flatComments = [], postId, p
           replyBoxContainerRef={replyBoxContainerRef}
           onDisableReplyBox={disableReplyBox}
           onClearReplyTarget={() => setReplyTarget(null)}
+          onReplySubmitted={finishTargetedReply}
           commentLoadMode={commentLoadMode}
         />
       ) : null}

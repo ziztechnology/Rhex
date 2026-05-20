@@ -178,6 +178,7 @@ export async function getAdminUserDetail(userId: number): Promise<AdminUserDetai
     avatarPath: user.avatarPath ?? null,
     role: user.role,
     status: user.status,
+    statusExpiresAt: user.statusExpiresAt?.toISOString() ?? null,
     email: user.email ?? null,
     phone: user.phone ?? null,
     points: user.points,

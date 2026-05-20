@@ -5,6 +5,7 @@ import { useState, useTransition } from "react"
 
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 
 interface AdminUserStatusModalProps {
@@ -16,6 +17,7 @@ interface AdminUserStatusModalProps {
 export function AdminUserStatusModal({ userId, username, action }: AdminUserStatusModalProps) {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState("")
+  const [statusExpiresAt, setStatusExpiresAt] = useState("")
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -42,10 +44,17 @@ export function AdminUserStatusModal({ userId, username, action }: AdminUserStat
                   const response = await fetch("/api/admin/actions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: action === "ban" ? "user.ban" : "user.mute", targetId: String(userId), message }),
+                    body: JSON.stringify({
+                      action: action === "ban" ? "user.ban" : "user.mute",
+                      targetId: String(userId),
+                      message,
+                      statusExpiresAt: statusExpiresAt || null,
+                      statusExpiresAtTimezoneOffsetMinutes: statusExpiresAt ? new Date().getTimezoneOffset() : null,
+                    }),
                   })
                   if (response.ok) {
                     setOpen(false)
+                    setStatusExpiresAt("")
                     router.refresh()
                   }
                 })
@@ -59,7 +68,19 @@ export function AdminUserStatusModal({ userId, username, action }: AdminUserStat
           </div>
         }
       >
-        <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`填写${actionText}原因（可选）`} className="min-h-[120px] rounded-xl bg-background px-4 py-3" />
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">自动解除时间</span>
+            <Input
+              type="datetime-local"
+              value={statusExpiresAt}
+              onChange={(event) => setStatusExpiresAt(event.target.value)}
+              className="h-10 rounded-full bg-background"
+            />
+            <span className="text-xs text-muted-foreground">不填写则永久{actionText}。</span>
+          </label>
+          <Textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder={`填写${actionText}原因（可选）`} className="min-h-[120px] rounded-xl bg-background px-4 py-3" />
+        </div>
       </Modal>
     </>
   )

@@ -113,6 +113,7 @@ export async function getAdminUsers(options: GetAdminUsersOptions = {}): Promise
     avatarPath: user.avatarPath ?? null,
     role: user.role,
     status: user.status,
+    statusExpiresAt: user.statusExpiresAt?.toISOString() ?? null,
     email: user.email ?? null,
     phone: user.phone ?? null,
     points: user.points,

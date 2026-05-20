@@ -157,15 +157,20 @@ export function PostAdminPanel({
           extra: { scope },
         }))
 
-  const postVisibilityAction: AdminQuickAction = postStatus === "OFFLINE"
-    ? { action: "post.show", targetId: postId, label: "上线帖子" }
-    : { action: "post.hide", targetId: postId, label: "下线帖子", tone: "danger" as const }
+  const postStatusActions: AdminQuickAction[] = postStatus === "OFFLINE"
+    ? [{ action: "post.show", targetId: postId, label: "上线帖子" }]
+    : [
+        postStatus === "LOCKED"
+          ? { action: "post.unlock", targetId: postId, label: "开放回复" }
+          : { action: "post.lock", targetId: postId, label: "关闭回复" },
+        { action: "post.hide", targetId: postId, label: "下线帖子", tone: "danger" as const },
+      ]
 
   const actions: AdminQuickAction[] = [
     ...pinActions,
     { action: "post.feature", targetId: postId, label: isFeatured ? "取消精华" : "设为精华" },
     ...userActions,
-    postVisibilityAction,
+    ...postStatusActions,
     { action: "post.delete", targetId: postId, label: "删除帖子", tone: "danger" as const },
   ]
 

@@ -8,6 +8,7 @@ import {
   normalizeHookedAvatarPath,
   type HookableUserBadge,
 } from "@/lib/user-presentation"
+import { maskUserName, shouldMaskBannedUser } from "@/lib/user-display"
 
 interface HookableUserPresentationInput {
   userId?: number | null
@@ -15,6 +16,7 @@ interface HookableUserPresentationInput {
   displayName: string
   avatarPath?: string | null
   role?: string | null
+  status?: string | null
   badges?: readonly HookableUserBadge[] | null
 }
 
@@ -26,6 +28,13 @@ interface HookedUserPresentationResult {
 async function resolveHookedUserPresentation(
   input: HookableUserPresentationInput,
 ): Promise<HookedUserPresentationResult> {
+  if (shouldMaskBannedUser(input.status)) {
+    return {
+      displayName: maskUserName(input.displayName || input.username),
+      avatarPath: null,
+    }
+  }
+
   const badgeCodes = collectHookableBadgeCodes(input.badges)
   const payload = {
     ...(typeof input.userId === "number" ? { userId: input.userId } : {}),
@@ -89,7 +98,7 @@ export async function applyHookedUserPresentationToSitePosts<
         username: item.authorUsername,
         displayName: item.author,
         avatarPath: item.authorAvatarPath,
-        role: item.authorStatus,
+        status: item.authorStatus,
         badges: item.authorDisplayedBadges,
       })
     }
@@ -111,7 +120,7 @@ export async function applyHookedUserPresentationToSitePosts<
           username: item.authorUsername,
           displayName: item.author,
           avatarPath: item.authorAvatarPath,
-          role: item.authorStatus,
+          status: item.authorStatus,
           badges: item.authorDisplayedBadges,
         })
       : null
@@ -147,6 +156,7 @@ interface HookableCommentEntry {
   authorUsername: string
   authorAvatarPath?: string | null
   authorRole?: string
+  authorStatus?: string
   authorIsAnonymous?: boolean
   authorDisplayedBadges?: readonly HookableUserBadge[]
 }
@@ -165,6 +175,7 @@ function applyHookedPresentationToCommentEntry<TEntry extends HookableCommentEnt
     displayName: entry.author,
     avatarPath: entry.authorAvatarPath,
     role: entry.authorRole,
+    status: entry.authorStatus,
     badges: entry.authorDisplayedBadges,
   })
   const hooked = hookedMap.get(key)
@@ -194,6 +205,7 @@ export async function applyHookedUserPresentationToCommentThreads<
         displayName: item.author,
         avatarPath: item.authorAvatarPath,
         role: item.authorRole,
+        status: item.authorStatus,
         badges: item.authorDisplayedBadges,
       })
     }
@@ -206,6 +218,7 @@ export async function applyHookedUserPresentationToCommentThreads<
           displayName: reply.author,
           avatarPath: reply.authorAvatarPath,
           role: reply.authorRole,
+          status: reply.authorStatus,
           badges: reply.authorDisplayedBadges,
         })
       }
@@ -241,6 +254,7 @@ export async function applyHookedUserPresentationToFlatCommentItems<
       displayName: entry.author,
       avatarPath: entry.authorAvatarPath,
       role: entry.authorRole,
+      status: entry.authorStatus,
       badges: entry.authorDisplayedBadges,
     })
   }
@@ -268,6 +282,7 @@ export async function applyHookedUserPresentationToNamedItem<
     username: string
     avatarPath?: string | null
     role?: string | null
+    status?: string | null
     displayedBadges?: readonly HookableUserBadge[]
     id?: number
   },
@@ -278,6 +293,7 @@ export async function applyHookedUserPresentationToNamedItem<
     displayName: item.displayName,
     avatarPath: item.avatarPath,
     role: item.role,
+    status: item.status,
     badges: item.displayedBadges,
   })
 

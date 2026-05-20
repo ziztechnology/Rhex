@@ -2,6 +2,7 @@ import { prisma } from "@/db/client"
 import type { Prisma } from "@/db/types"
 import type { PinnedTimestampCursorPayload } from "@/lib/cursor-pagination"
 import { pinnedPostOrderBy } from "@/db/queries"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 const searchPostListSelect = {
   id: true,
@@ -57,7 +58,7 @@ const searchPostListSelect = {
 
 export function buildPostSearchWhere(keyword: string) {
   return {
-    status: "NORMAL" as const,
+    status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
     OR: [
       { title: { contains: keyword, mode: "insensitive" as const } },
       { summary: { contains: keyword, mode: "insensitive" as const } },

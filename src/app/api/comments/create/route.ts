@@ -28,7 +28,7 @@ export const POST = createUserRouteHandler(async ({ request, currentUser }) => {
     },
   }, result.reviewRequired
     ? "当前节点开启回帖审核，回复已进入审核"
-    : `${result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}` : "回复成功"}${result.contentAdjusted ? "，部分内容已自动替换" : ""}`)
+    : `${result.privateRecipientName ? `已发送私密回复给 ${result.privateRecipientName}` : result.normalizedReplyToUserName ? `已回复 @${result.normalizedReplyToUserName}` : "回复成功"}${result.contentAdjusted ? "，部分内容已自动替换" : ""}`)
 }, {
   errorMessage: "评论失败",
   logPrefix: "[api/comments/create] unexpected error",

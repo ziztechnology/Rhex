@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
-import { CornerDownRight, Flag } from "lucide-react"
+import { CornerDownRight, Flag, Lock } from "lucide-react"
 
 import { AddonSurfaceClientRenderer } from "@/addons-host/client/addon-surface-client-renderer"
 import { AiAgentIndicator } from "@/components/user/ai-agent-indicator"
@@ -246,6 +246,12 @@ function CommentAuthorMetaContent({
               回复 @{replyToAuthor}
             </span>
           ) : null}
+          {entry.isPrivate && entry.canViewPrivateContent !== false ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
+              <Lock className="h-3 w-3" />
+              仅 {entry.privateRecipientName ?? "指定用户"} 可见
+            </span>
+          ) : null}
           <span>·</span>
           <TimeTooltip value={entry.createdAtRaw}>
             <span>{entry.createdAt}</span>
@@ -277,6 +283,15 @@ function CommentAuthorMetaContent({
         </div>
       )}
     />
+  )
+}
+
+function PrivateCommentPlaceholder({ recipientName }: { recipientName?: string | null }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-lg bg-secondary/45 px-3 py-2 text-sm text-muted-foreground">
+      <Lock className="h-4 w-4" />
+      <span>仅 {recipientName ?? "指定用户"} 可见</span>
+    </div>
   )
 }
 
@@ -527,6 +542,8 @@ export function CommentThreadReplyItem({
                     ) : null}
                     {replyUnavailableMessage ? (
                       <CommentUnavailablePlaceholder message={replyUnavailableMessage} />
+                    ) : reply.isPrivate && !reply.canViewPrivateContent ? (
+                      <PrivateCommentPlaceholder recipientName={reply.privateRecipientName} />
                     ) : (
                       <MarkdownContent content={reply.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} collapseLongCodeBlocks />
                     )}
@@ -716,6 +733,8 @@ export function CommentThreadCommentItem({
                     <CommentReviewStatusNotice status={comment.status} reviewNote={comment.reviewNote} isAdmin={isAdmin} isOwner={canEditCurrentComment} />
                     {commentUnavailableMessage ? (
                       <CommentUnavailablePlaceholder message={commentUnavailableMessage} />
+                    ) : comment.isPrivate && !comment.canViewPrivateContent ? (
+                      <PrivateCommentPlaceholder recipientName={comment.privateRecipientName} />
                     ) : (
                       <MarkdownContent content={comment.content} className="text-[13px] leading-6 text-foreground/90 dark:text-foreground/85 sm:text-sm sm:leading-7" markdownEmojiMap={markdownEmojiMap} collapseLongCodeBlocks />
                     )}

@@ -135,6 +135,7 @@ function classifyInstallPermissionRisk(permission: string) {
     "comment:like",
     "message:send",
     "notification:create",
+    "email:send",
     "follow:user",
     "points:adjust",
     "badge:grant",

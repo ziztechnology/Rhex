@@ -3,6 +3,11 @@ export type CaptchaMode = "OFF" | "TURNSTILE" | "BUILTIN" | "POW"
 export interface FooterLinkItem {
   label: string
   href: string
+  icon?: string
+  textColor?: string
+  iconColor?: string
+  bold?: boolean
+  fontSizePx?: string
 }
 
 export const DEFAULT_FOOTER_LINKS: FooterLinkItem[] = [
@@ -58,10 +63,35 @@ export function normalizeFooterLinks(raw: unknown) {
     .map((item) => ({
       label: String(item?.label ?? "").trim(),
       href: String(item?.href ?? "").trim(),
+      icon: String(item?.icon ?? "").trim(),
+      textColor: normalizeOptionalHexColor(item?.textColor),
+      iconColor: normalizeOptionalHexColor(item?.iconColor),
+      bold: Boolean(item?.bold),
+      fontSizePx: normalizeOptionalPixelValue(item?.fontSizePx, 10, 24),
     }))
     .filter((item) => item.label && item.href)
 
   return normalized.length > 0 ? normalized : [...DEFAULT_FOOTER_LINKS]
+}
+
+function normalizeOptionalHexColor(value: unknown) {
+  const normalized = String(value ?? "").trim()
+  return /^#[0-9a-fA-F]{6}$/.test(normalized) ? normalized : undefined
+}
+
+function normalizeOptionalPixelValue(value: unknown, min: number, max: number) {
+  const normalized = String(value ?? "").trim()
+  if (!normalized) {
+    return undefined
+  }
+
+  const numericValue = Number(normalized)
+  if (!Number.isFinite(numericValue)) {
+    return undefined
+  }
+
+  const boundedValue = Math.min(max, Math.max(min, Math.round(numericValue)))
+  return String(boundedValue)
 }
 
 export function parseFooterLinks(raw: string | null | undefined) {

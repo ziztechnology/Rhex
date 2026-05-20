@@ -1,17 +1,8 @@
 import { executeAddonWaterfallHook } from "@/addons-host/runtime/hooks"
-
-export interface UserDisplayNameSource {
-  username: string
-  nickname?: string | null
-}
+import { getBaseUserDisplayName, type UserDisplayNameSource } from "@/lib/user-display-shared"
 
 export function getUserDisplayName(user: UserDisplayNameSource | null | undefined, fallback = "") {
-  if (!user) {
-    return fallback
-  }
-
-  const nickname = user.nickname?.trim()
-  return nickname || user.username || fallback
+  return getBaseUserDisplayName(user, fallback)
 }
 
 /**
@@ -26,3 +17,10 @@ export async function getUserDisplayNameWithAddons(
   const { value } = await executeAddonWaterfallHook("user.displayName.value", base)
   return value
 }
+
+export {
+  getUserAvatarPath,
+  maskUserName,
+  shouldMaskBannedUser,
+  type UserDisplayNameSource,
+} from "@/lib/user-display-shared"

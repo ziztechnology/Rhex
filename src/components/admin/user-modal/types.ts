@@ -59,6 +59,7 @@ export interface PermissionsFormState {
 
 export interface AccountFormState {
   statusMessage: string
+  statusExpiresAtDraft: string
   statusFeedback: string
   newPassword: string
   confirmPassword: string

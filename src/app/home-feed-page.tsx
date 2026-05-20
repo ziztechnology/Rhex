@@ -70,7 +70,7 @@ const HOME_FEED_LABELS: Record<HomeFeedSort, string> = {
 interface HomeFeedPageProps {
   sort?: HomeFeedSort
   addonTabSlug?: string
-  searchParams?: Promise<{ page?: string | string[] }>
+  searchParams?: Promise<{ page?: string | string[]; source?: string | string[] }>
   mainTopSlot?: ReactNode
   autoCheckInOnEnter?: boolean
   enableUniverseSourceFilter?: boolean
@@ -131,7 +131,9 @@ export async function HomeFeedPage({
 }: HomeFeedPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined
   const rawPage = resolvedSearchParams?.page
+  const rawUniverseSource = resolvedSearchParams?.source
   const currentPage = parseHomeFeedPage(rawPage)
+  const currentUniverseSourceId = typeof rawUniverseSource === "string" ? rawUniverseSource.trim() : ""
 
   if (!sort && !addonTabSlug) {
     throw new Error("HomeFeedPage requires sort or addonTabSlug")
@@ -221,7 +223,7 @@ export async function HomeFeedPage({
       : null
   const universeFeedPage =
     currentSort === "universe" && !enableUniverseSourceFilter
-      ? await getRssUniverseFeedPage(currentPage, rssHomeSettings.homePageSize)
+      ? await getRssUniverseFeedPage(currentPage, rssHomeSettings.homePageSize, null, currentUser?.id)
       : null
   const addonFeedResult = currentAddonTab
     ? await renderAddonHomeFeedTab({
@@ -346,10 +348,10 @@ export async function HomeFeedPage({
       ) : currentSort === "universe" ? (
         <>
           {enableUniverseSourceFilter ? (
-            <RssUniversePageClient initialPage={currentPage} />
+            <RssUniversePageClient initialPage={currentPage} initialSourceId={currentUniverseSourceId || null} />
           ) : universeFeedPage ? (
             <>
-              <RssUniverseFeedView items={universeFeedPage.items} />
+              <RssUniverseFeedView items={universeFeedPage.items} support={universeFeedPage.support} />
               {universeFeedPage.items.length === 0 ? (
                 <div className="mt-4 rounded-md border bg-background p-8 text-sm text-muted-foreground">
                   宇宙栏目还没有可展示的采集内容。

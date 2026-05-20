@@ -31,7 +31,7 @@ import { resolveTaskDrivenCheckInRewardRanges } from "@/lib/task-check-in-displa
 import { type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeUploadProvider } from "@/lib/upload-provider"
 import type { ServerSiteSettingsData, SiteSettingsData } from "@/lib/site-settings.types"
-import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks } from "./site-header-app-links"
+import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks, resolveTopHeaderAppLinks } from "./site-header-app-links"
 import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
 
 export type { FooterLinkItem } from "@/lib/shared/config-parsers"
@@ -85,6 +85,9 @@ function normalizeLegacyServerSiteSettings(data: ServerSiteSettingsData): Server
     registerEmailWhitelistEnabled: typeof data.registerEmailWhitelistEnabled === "boolean"
       ? data.registerEmailWhitelistEnabled
       : defaults.registerEmailWhitelistEnabled,
+    topHeaderAppLinks: Array.isArray(data.topHeaderAppLinks)
+      ? data.topHeaderAppLinks
+      : defaults.topHeaderAppLinks,
     registerEmailWhitelistDomains: Array.isArray(data.registerEmailWhitelistDomains)
       ? data.registerEmailWhitelistDomains.filter((item): item is string => typeof item === "string")
       : defaults.registerEmailWhitelistDomains,
@@ -425,6 +428,7 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     footerLinks: filterMessageNavigationLinks(parseFooterLinks(record.footerLinksJson), messageMediaSettings.enabled),
     headerAppLinks: filterMessageNavigationLinks(parseSiteHeaderAppLinks(record.headerAppLinksJson), messageMediaSettings.enabled),
     headerAppIconName: normalizeHeaderAppIconName(record.headerAppIconName),
+    topHeaderAppLinks: filterMessageNavigationLinks(resolveTopHeaderAppLinks(record.appStateJson), messageMediaSettings.enabled),
     messageEnabled: messageMediaSettings.enabled,
     theme: themeSettings,
     search: searchSettings,

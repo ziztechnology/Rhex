@@ -9,6 +9,7 @@ import { PostRewardPoolIcon } from "@/components/post/post-list-shared"
 import { toast } from "@/components/ui/toast"
 import { Tooltip } from "@/components/ui/tooltip"
 import type { SiteCommentItem, SiteCommentReplyItem } from "@/lib/comments"
+import { copyTextToClipboard } from "@/lib/clipboard"
 import type { CommentReplyTarget } from "@/lib/comment-reply-box-events"
 import { COMMENT_LOAD_MODE_PAGINATION, type CommentLoadMode } from "@/lib/comment-load-mode"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
@@ -254,15 +255,14 @@ export async function copyCommentPermalink(commentId: string, floor: number, pos
   }
   url.hash = `comment-${commentId}`
 
-  try {
-    await navigator.clipboard.writeText(url.toString())
+  if (await copyTextToClipboard(url.toString())) {
     toast.success(`已复制 #${floor} 楼链接`, "复制成功")
-  } catch {
-    toast.error("复制失败，请手动复制", "复制失败")
+    return
   }
+  toast.error("复制失败，请手动复制", "复制失败")
 }
 
-export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, anonymousIdentityEnabled, anonymousIdentityDefaultChecked, anonymousIdentitySwitchVisible, markdownEmojiMap, replyTarget, replyHint, isReplyBoxPinned, isReplyBoxFollowing, replyBoxPinnedLayout, replyBoxContainerRef, onDisableReplyBox, onClearReplyTarget, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION }: { postId: string; commentsVisibleToAuthorOnly: boolean; anonymousIdentityEnabled?: boolean; anonymousIdentityDefaultChecked?: boolean; anonymousIdentitySwitchVisible?: boolean; markdownEmojiMap?: MarkdownEmojiItem[]; replyTarget: CommentReplyTarget | null; replyHint: string | null; isReplyBoxPinned: boolean; isReplyBoxFollowing: boolean; replyBoxPinnedLayout: { left: number; width: number }; replyBoxContainerRef: RefObject<HTMLDivElement | null>; onDisableReplyBox: () => void; onClearReplyTarget: () => void; commentLoadMode?: CommentLoadMode }) {
+export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, anonymousIdentityEnabled, anonymousIdentityDefaultChecked, anonymousIdentitySwitchVisible, markdownEmojiMap, replyTarget, replyHint, isReplyBoxPinned, isReplyBoxFollowing, replyBoxPinnedLayout, replyBoxContainerRef, onDisableReplyBox, onClearReplyTarget, onReplySubmitted, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION }: { postId: string; commentsVisibleToAuthorOnly: boolean; anonymousIdentityEnabled?: boolean; anonymousIdentityDefaultChecked?: boolean; anonymousIdentitySwitchVisible?: boolean; markdownEmojiMap?: MarkdownEmojiItem[]; replyTarget: CommentReplyTarget | null; replyHint: string | null; isReplyBoxPinned: boolean; isReplyBoxFollowing: boolean; replyBoxPinnedLayout: { left: number; width: number }; replyBoxContainerRef: RefObject<HTMLDivElement | null>; onDisableReplyBox: () => void; onClearReplyTarget: () => void; onReplySubmitted?: () => void; commentLoadMode?: CommentLoadMode }) {
   const isPinnedLayout = isReplyBoxPinned
   const isFloatingPinnedLayout = isReplyBoxPinned && isReplyBoxFollowing
   const floatingPinnedStyle = isFloatingPinnedLayout
@@ -307,6 +307,7 @@ export function CommentThreadReplyBox({ postId, commentsVisibleToAuthorOnly, ano
           replyToUserName={replyTarget?.replyToUserName}
           replyToCommentId={replyTarget?.replyToCommentId}
           onCancel={onClearReplyTarget}
+          onSubmitted={replyTarget ? onReplySubmitted : undefined}
           commentsVisibleToAuthorOnly={commentsVisibleToAuthorOnly}
           anonymousIdentityEnabled={anonymousIdentityEnabled}
           anonymousIdentityDefaultChecked={anonymousIdentityDefaultChecked}

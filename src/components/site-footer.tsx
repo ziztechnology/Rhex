@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { Github } from "lucide-react"
-import type { ReactNode } from "react"
+import type { CSSProperties, ReactNode } from "react"
 
 import packageJson from "../../package.json"
 
+import { LevelIcon } from "@/components/level-icon"
 import { SiteAnalytics } from "@/components/site-analytics"
 import { getSiteSettings } from "@/lib/site-settings"
 import ShinyText from '@/components/ShinyText';
@@ -83,8 +84,6 @@ function renderFooterCopyrightText(text: string) {
   return nodes.length > 0 ? nodes : text
 }
 
-
-
 export async function SiteFooter() {
   const settings = await getSiteSettings()
   const fallbackCopyrightText = `${settings.siteName} @ ${new Date().getFullYear()}`
@@ -125,6 +124,15 @@ export async function SiteFooter() {
               <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:justify-end">
                 {settings.footerLinks.map((item) => {
                   const isExternal = isExternalHref(item.href)
+                  const hasIcon = (item.icon ?? "").trim().length > 0
+                  const linkStyle: CSSProperties = {
+                    ...(item.textColor ? { color: item.textColor } : {}),
+                    ...(item.bold ? { fontWeight: 700 } : {}),
+                    ...(item.fontSizePx ? { fontSize: `${item.fontSizePx}px` } : {}),
+                  }
+                  const iconStyle: CSSProperties = {
+                    color: item.iconColor || item.textColor || "currentColor",
+                  }
 
                   return (
                     <Link
@@ -132,9 +140,15 @@ export async function SiteFooter() {
                       href={item.href}
                       target={isExternal ? "_blank" : undefined}
                       rel={isExternal ? "noreferrer noopener" : undefined}
-                      className="rounded-[14px] px-3 py-2 text-center text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-[14px] px-3 py-2 text-center text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      style={linkStyle}
                     >
-                      {item.label}
+                      {hasIcon ? (
+                        <span className="inline-flex size-4 shrink-0 items-center justify-center" style={iconStyle}>
+                          <LevelIcon icon={item.icon ?? ""} className="size-4 text-sm" emojiClassName="text-inherit" svgClassName="[&>svg]:block" title={item.label} />
+                        </span>
+                      ) : null}
+                      <span className="min-w-0 truncate">{item.label}</span>
                     </Link>
                   )
                 })}

@@ -16,6 +16,7 @@ import { getUserDisplayName } from "@/lib/users"
 import { getVipLevel, isVipActive } from "@/lib/vip-status"
 
 const AUTHOR_ONLY_COMMENT_PLACEHOLDER = "此评论仅楼主可看"
+const PRIVATE_COMMENT_PLACEHOLDER_PREFIX = "此回复仅"
 
 interface SiteCommentRewardClaim {
   amount: number
@@ -65,6 +66,10 @@ export interface SiteCommentReplyItem {
   isPostAuthor: boolean
   postId: string
   replyToAuthor?: string
+  isPrivate?: boolean
+  canViewPrivateContent?: boolean
+  privateRecipientName?: string | null
+  privateRecipientUserId?: number | null
   content: string
   createdAt: string
   createdAtRaw: string
@@ -125,6 +130,10 @@ export interface SiteCommentItem {
   }>
   isPostAuthor: boolean
   postId: string
+  isPrivate?: boolean
+  canViewPrivateContent?: boolean
+  privateRecipientName?: string | null
+  privateRecipientUserId?: number | null
   content: string
   createdAt: string
   createdAtRaw: string
@@ -270,6 +279,12 @@ function buildCommentExcerpt(content: string, limit = 56) {
   return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized
 }
 
+function buildPrivateCommentPlaceholder(recipientName?: string | null) {
+  return recipientName
+    ? `${PRIVATE_COMMENT_PLACEHOLDER_PREFIX} ${recipientName} 可见`
+    : "此回复为私密回复"
+}
+
 export async function getCommentsByPostId(
   postId: string,
   options: GetCommentsOptions = {},
@@ -309,6 +324,7 @@ export async function getCommentsByPostId(
       userId: number
       useAnonymousIdentity: boolean
       parentId: string | null
+      privateRecipientUserId: number | null
       content: string
       likeCount: number
       tipCount: number
@@ -317,12 +333,15 @@ export async function getCommentsByPostId(
       isPinnedByAuthor: boolean
       createdAt: Date
       user: CommentQueryUser
+      privateRecipient?: CommentQueryUser | null
       replyToUser?: CommentQueryUser | null
       parent?: {
         id: string
         status: "NORMAL" | "HIDDEN" | "PENDING"
         userId: number
         useAnonymousIdentity: boolean
+        privateRecipientUserId: number | null
+        privateRecipient?: CommentQueryUser | null
         content: string
         createdAt: Date
       } | null
@@ -331,11 +350,37 @@ export async function getCommentsByPostId(
         status: "NORMAL" | "HIDDEN" | "PENDING"
         userId: number
         useAnonymousIdentity: boolean
+        privateRecipientUserId: number | null
+        privateRecipient?: CommentQueryUser | null
         content: string
         createdAt: Date
         user: CommentQueryUser
       } | null
       likes?: CommentQueryLike[]
+    }
+
+    const getPrivateRecipientName = (comment: Pick<RawCommentRecord, "privateRecipientUserId" | "privateRecipient">) => (
+      comment.privateRecipientUserId
+        ? comment.privateRecipient
+          ? getUserDisplayName(comment.privateRecipient)
+          : "指定用户"
+        : null
+    )
+
+    const canViewPrivateCommentContent = (comment: Pick<RawCommentRecord, "userId" | "privateRecipientUserId">) => {
+      if (!comment.privateRecipientUserId) {
+        return true
+      }
+
+      return Boolean(viewer?.userId && (viewer.userId === comment.userId || viewer.userId === comment.privateRecipientUserId))
+    }
+
+    const resolveCommentContentForViewer = (comment: Pick<RawCommentRecord, "userId" | "privateRecipientUserId" | "privateRecipient" | "content">) => {
+      if (!canViewPrivateCommentContent(comment)) {
+        return buildPrivateCommentPlaceholder(getPrivateRecipientName(comment))
+      }
+
+      return shouldMaskComment(comment.userId) ? AUTHOR_ONLY_COMMENT_PLACEHOLDER : comment.content
     }
 
     const mapReplyItem = (
@@ -360,6 +405,8 @@ export async function getCommentsByPostId(
       const replyToAuthor = viewer?.postIsAnonymous && comment.replyToComment?.useAnonymousIdentity
         ? (viewer.anonymousPostAuthor?.name ?? viewer.anonymousPostAuthor?.username ?? "匿名用户")
         : (comment.replyToUser ? comment.replyToUser.nickname ?? comment.replyToUser.username : undefined)
+      const privateRecipientName = getPrivateRecipientName(comment)
+      const canViewPrivateContent = canViewPrivateCommentContent(comment)
 
       return {
         id: comment.id,
@@ -380,7 +427,11 @@ export async function getCommentsByPostId(
         authorDisplayedBadges: displayAsAnonymous ? anonymousCommentIdentity.authorDisplayedBadges : mapDisplayedBadges(comment.user),
         isPostAuthor: isVisiblePostAuthor,
         replyToAuthor,
-        content: shouldMaskComment(comment.userId) ? AUTHOR_ONLY_COMMENT_PLACEHOLDER : comment.content,
+        isPrivate: Boolean(comment.privateRecipientUserId),
+        canViewPrivateContent,
+        privateRecipientName,
+        privateRecipientUserId: comment.privateRecipientUserId,
+        content: resolveCommentContentForViewer(comment),
         createdAt: formatRelativeTime(comment.createdAt),
         createdAtRaw: comment.createdAt.toISOString(),
         likes: comment.likeCount,
@@ -411,6 +462,8 @@ export async function getCommentsByPostId(
       const isVisiblePostAuthor = Boolean(comment.userId === viewer?.postAuthorId && !displayAsAnonymous)
       const displayIdentity = displayAsAnonymous ? viewer?.anonymousPostAuthor : null
       const anonymousCommentIdentity = getAnonymousCommentIdentity(displayIdentity)
+      const privateRecipientName = getPrivateRecipientName(comment)
+      const canViewPrivateContent = canViewPrivateCommentContent(comment)
 
       return {
         id: comment.id,
@@ -430,7 +483,11 @@ export async function getCommentsByPostId(
         authorVerification: displayAsAnonymous ? anonymousCommentIdentity.authorVerification : mapVerification(comment.user),
         authorDisplayedBadges: displayAsAnonymous ? anonymousCommentIdentity.authorDisplayedBadges : mapDisplayedBadges(comment.user),
         isPostAuthor: isVisiblePostAuthor,
-        content: shouldMaskComment(comment.userId) ? AUTHOR_ONLY_COMMENT_PLACEHOLDER : comment.content,
+        isPrivate: Boolean(comment.privateRecipientUserId),
+        canViewPrivateContent,
+        privateRecipientName,
+        privateRecipientUserId: comment.privateRecipientUserId,
+        content: resolveCommentContentForViewer(comment),
         createdAt: formatRelativeTime(comment.createdAt),
         createdAtRaw: comment.createdAt.toISOString(),
         likes: comment.likeCount,
@@ -666,9 +723,11 @@ export async function getCommentsByPostId(
           ? !(parentComment.status === "HIDDEN" && !viewer?.isAdmin)
           : false
         const parentCommentExcerpt = parentComment
-          ? shouldMaskComment(parentComment.userId)
-            ? AUTHOR_ONLY_COMMENT_PLACEHOLDER
-            : parentCommentIsVisible
+          ? !canViewPrivateCommentContent(parentComment)
+            ? buildPrivateCommentPlaceholder(getPrivateRecipientName(parentComment))
+            : shouldMaskComment(parentComment.userId)
+              ? AUTHOR_ONLY_COMMENT_PLACEHOLDER
+              : parentCommentIsVisible
               ? buildCommentExcerpt(parentComment.content)
               : "原评论当前不可见"
           : "原评论不存在或已不可见"
@@ -677,9 +736,11 @@ export async function getCommentsByPostId(
           ? !(referenceComment.status === "HIDDEN" && !viewer?.isAdmin)
           : false
         const referenceCommentExcerpt = referenceComment
-          ? shouldMaskComment(referenceComment.userId)
-            ? AUTHOR_ONLY_COMMENT_PLACEHOLDER
-            : referenceCommentIsVisible
+          ? !canViewPrivateCommentContent(referenceComment)
+            ? buildPrivateCommentPlaceholder(getPrivateRecipientName(referenceComment))
+            : shouldMaskComment(referenceComment.userId)
+              ? AUTHOR_ONLY_COMMENT_PLACEHOLDER
+              : referenceCommentIsVisible
               ? buildCommentExcerpt(referenceComment.content)
               : "原评论当前不可见"
           : "原评论不存在或已不可见"

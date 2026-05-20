@@ -19,6 +19,7 @@ import {
   getAdminNavigationItem,
   type AdminNavKey,
 } from "@/lib/admin-navigation"
+import { getAvatarFallback } from "@/lib/avatar"
 
 const adminThemeStyle: CSSProperties = {
   ["--sidebar-width" as string]: "8rem",
@@ -38,10 +39,7 @@ interface AdminShellProps {
 }
 
 function getInitials(name: string) {
-  return name
-    .trim()
-    .slice(0, 2)
-    .toUpperCase()
+  return getAvatarFallback(name)
 }
 
 export async function AdminShell({

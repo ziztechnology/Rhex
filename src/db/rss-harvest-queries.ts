@@ -21,6 +21,7 @@ const rssSettingSelect = {
 const rssSourceAdminSelect = {
   id: true,
   siteName: true,
+  description: true,
   feedUrl: true,
   logoPath: true,
   intervalMinutes: true,
@@ -33,6 +34,31 @@ const rssSourceAdminSelect = {
 
 export type RssSettingRecord = Prisma.RssSettingGetPayload<{ select: typeof rssSettingSelect }>
 export type RssSourceAdminRecord = Prisma.RssSourceGetPayload<{ select: typeof rssSourceAdminSelect }>
+
+const rssSourceApplicationAdminSelect = {
+  id: true,
+  applicantId: true,
+  siteName: true,
+  description: true,
+  feedUrl: true,
+  status: true,
+  reviewNote: true,
+  reviewedById: true,
+  reviewedAt: true,
+  sourceId: true,
+  createdAt: true,
+  updatedAt: true,
+  applicant: {
+    select: {
+      id: true,
+      username: true,
+      nickname: true,
+      avatarPath: true,
+    },
+  },
+} satisfies Prisma.RssSourceApplicationSelect
+
+export type RssSourceApplicationAdminRecord = Prisma.RssSourceApplicationGetPayload<{ select: typeof rssSourceApplicationAdminSelect }>
 
 export async function getOrCreateRssSettingRecord() {
   const existing = await prisma.rssSetting.findFirst({
@@ -123,5 +149,36 @@ export function createManyRssEntries(data: Prisma.RssEntryCreateManyInput[]) {
 export function countRssEntriesForSource(sourceId: string) {
   return prisma.rssEntry.count({
     where: { sourceId },
+  })
+}
+
+export function countPendingRssSourceApplications() {
+  return prisma.rssSourceApplication.count({
+    where: { status: "PENDING" },
+  })
+}
+
+export function listPendingRssSourceApplications(take = 20) {
+  return prisma.rssSourceApplication.findMany({
+    where: { status: "PENDING" },
+    orderBy: [
+      { createdAt: "asc" },
+      { id: "asc" },
+    ],
+    take,
+    select: rssSourceApplicationAdminSelect,
+  })
+}
+
+export function findPendingRssSourceApplicationByFeedUrl(feedUrl: string, applicantId?: number) {
+  return prisma.rssSourceApplication.findFirst({
+    where: {
+      feedUrl,
+      status: "PENDING",
+      ...(applicantId ? { applicantId } : {}),
+    },
+    select: {
+      id: true,
+    },
   })
 }

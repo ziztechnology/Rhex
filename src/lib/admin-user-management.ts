@@ -35,6 +35,7 @@ export interface AdminUserListItem {
   avatarPath: string | null
   role: string
   status: string
+  statusExpiresAt: string | null
   email: string | null
   phone: string | null
   points: number
@@ -162,6 +163,7 @@ export interface AdminUserDetailResult {
   avatarPath: string | null
   role: string
   status: string
+  statusExpiresAt: string | null
   email: string | null
   phone: string | null
   points: number

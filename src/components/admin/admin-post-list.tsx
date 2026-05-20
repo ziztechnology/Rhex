@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/table"
 import { Tooltip } from "@/components/ui/tooltip"
 import type { AdminPostListItem, AdminPostListResult } from "@/lib/admin-post-management"
+import { getAvatarFallback } from "@/lib/avatar"
 import { formatMonthDayTime, formatNumber } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
@@ -82,7 +83,7 @@ const statusFilters = [
   { value: "ALL", label: "全部状态" },
   { value: "PENDING", label: "待审核" },
   { value: "NORMAL", label: "正常" },
-  { value: "LOCKED", label: "已关闭" },
+  { value: "LOCKED", label: "已关闭回复" },
   { value: "OFFLINE", label: "已下线" },
 ]
 
@@ -478,10 +479,10 @@ export function AdminPostList({ data }: AdminPostListProps) {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={openBatchMoveDialog}>批量换节点</Button>
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.lock", "批量关闭帖子", `确认关闭已选中的 ${selectedCount} 篇帖子吗？关闭后将进入已锁定状态。`, "批量关闭")}>批量关闭</Button>
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.unlock", "批量开放帖子", `确认开放已选中的 ${selectedCount} 篇帖子吗？`, "批量开放")}>批量开放</Button>
-              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.show", "批量恢复帖子", `确认恢复已选中的 ${selectedCount} 篇帖子吗？`, "批量恢复")}>批量恢复</Button>
-              <Button type="button" variant="outline" size="sm" className="rounded-full border-rose-200 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.hide", "批量隐藏帖子", `确认隐藏已选中的 ${selectedCount} 篇帖子吗？隐藏后前台不再展示。`, "批量隐藏", true)}>批量隐藏</Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.lock", "批量关闭回复", `确认关闭已选中的 ${selectedCount} 篇帖子的回复吗？关闭后帖子仍可查看，但不能继续回复。`, "批量关闭回复")}>批量关闭回复</Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.unlock", "批量开放回复", `确认开放已选中的 ${selectedCount} 篇帖子的回复吗？`, "批量开放回复")}>批量开放回复</Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-xs" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.show", "批量上线帖子", `确认上线已选中的 ${selectedCount} 篇帖子吗？`, "批量上线")}>批量上线</Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-full border-rose-200 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.hide", "批量下线帖子", `确认下线已选中的 ${selectedCount} 篇帖子吗？下线后前台不再公开展示。`, "批量下线", true)}>批量下线</Button>
               <Button type="button" variant="outline" size="sm" className="rounded-full border-rose-200 px-3 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700" disabled={selectedCount === 0 || isBatchPending} onClick={() => void confirmBatchAction("post.delete", "批量删除帖子", `确认删除已选中的 ${selectedCount} 篇帖子吗？此操作不可撤销。`, "批量删除", true)}>批量删除</Button>
             </div>
           </div>
@@ -496,66 +497,66 @@ export function AdminPostList({ data }: AdminPostListProps) {
               <OverviewActionLink href="/admin?tab=posts" label="重置筛选" />
             </div>
           ) : (
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[52px]">
+                  <TableHead className="w-11 px-3">
                     <Checkbox
                       checked={allCurrentPageSelected || someCurrentPageSelected}
                       onCheckedChange={(checked) => toggleSelectCurrentPage(checked === true)}
                       aria-label="全选本页帖子"
                     />
                   </TableHead>
-                  <TableHead>帖子</TableHead>
-                  <TableHead className="w-[140px]">节点</TableHead>
-                  <TableHead className="w-[130px]">作者</TableHead>
-                  <TableHead className="w-[120px]">状态</TableHead>
-                  <TableHead className="w-[180px]">标签 / 审核</TableHead>
-                  <TableHead className="w-[110px]">评论 / 点赞</TableHead>
-                  <TableHead className="w-[110px]">收藏 / 浏览</TableHead>
-                  <TableHead className="w-[110px]">打赏 / 热度</TableHead>
-                  <TableHead className="w-[140px]">时间</TableHead>
-                  <TableHead className="w-[280px] text-right">操作</TableHead>
+                  <TableHead className="min-w-0 px-3">帖子</TableHead>
+                  <TableHead className="w-28 px-3">节点</TableHead>
+                  <TableHead className="w-28 px-3">作者</TableHead>
+                  <TableHead className="w-28 px-3">状态</TableHead>
+                  <TableHead className="w-32 px-3">标签 / 审核</TableHead>
+                  <TableHead className="w-24 px-3">评论 / 点赞</TableHead>
+                  <TableHead className="w-24 px-3">收藏 / 浏览</TableHead>
+                  <TableHead className="w-24 px-3">打赏 / 热度</TableHead>
+                  <TableHead className="w-32 px-3">时间</TableHead>
+                  <TableHead className="w-20 px-3 text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.posts.map((post) => (
                   <TableRow key={post.id} data-state={selectedPostIds.includes(post.id) ? "selected" : undefined}>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <Checkbox
                         checked={selectedPostIds.includes(post.id)}
                         onCheckedChange={(checked) => toggleSelectPost(post.id, checked === true)}
                         aria-label={`选择帖子 ${post.title}`}
                       />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="min-w-0 px-3 align-top">
                       <PostTitleCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostBoardCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostAuthorCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostStatusCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostFlagsCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostEngagementCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostTrafficCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostOpsCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostTimeCell post={post} />
                     </TableCell>
-                    <TableCell className="align-top">
+                    <TableCell className="px-3 align-top">
                       <PostActionsCell
                         post={post}
                         canUseGlobalPin={canUseGlobalPin}
@@ -634,16 +635,16 @@ function PostTitleCell({ post }: { post: AdminPostListItem }) {
   const postHref = post.href ?? `/posts/${post.id}`
 
   return (
-    <div className="flex items-start gap-3">
-      <Avatar size="sm" className="mt-0.5 rounded-lg">
+    <div className="flex min-w-0 items-start gap-3">
+      <Avatar size="sm" className="mt-0.5 shrink-0 rounded-lg">
         <AvatarFallback className="rounded-lg">{getInitials(post.authorName)}</AvatarFallback>
       </Avatar>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <Tooltip content={post.title} className="w-full" disabled={post.title.length < 20}>
           <Link
             href={postHref}
             className={cn(
-              "block line-clamp-1 text-sm font-medium transition-colors hover:text-primary",
+              "block truncate text-sm font-medium transition-colors hover:text-primary",
               getPostTitleAccentClassName(post),
             )}
           >
@@ -652,7 +653,7 @@ function PostTitleCell({ post }: { post: AdminPostListItem }) {
         </Tooltip>
         {post.summary ? (
           <Tooltip content={post.summary} className="w-full" disabled={post.summary.length < 28}>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+            <p className="mt-1 line-clamp-2 max-w-full text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]">
               {post.summary}
             </p>
           </Tooltip>
@@ -666,18 +667,18 @@ function PostTitleCell({ post }: { post: AdminPostListItem }) {
 
 function PostBoardCell({ post }: { post: AdminPostListItem }) {
   return (
-    <div className="space-y-1 text-xs">
-      <p className="font-medium text-foreground">{post.boardName}</p>
-      <p className="text-muted-foreground">{post.zoneName ?? "未分区"}</p>
+    <div className="min-w-0 space-y-1 text-xs">
+      <p className="truncate font-medium text-foreground" title={post.boardName}>{post.boardName}</p>
+      <p className="truncate text-muted-foreground" title={post.zoneName ?? "未分区"}>{post.zoneName ?? "未分区"}</p>
     </div>
   )
 }
 
 function PostAuthorCell({ post }: { post: AdminPostListItem }) {
   return (
-    <div className="space-y-1 text-xs">
-      <p className="font-medium text-foreground">{post.authorName}</p>
-      <p className="text-muted-foreground">@{post.authorUsername}</p>
+    <div className="min-w-0 space-y-1 text-xs">
+      <p className="truncate font-medium text-foreground" title={post.authorName}>{post.authorName}</p>
+      <p className="truncate text-muted-foreground" title={`@${post.authorUsername}`}>@{post.authorUsername}</p>
     </div>
   )
 }
@@ -837,7 +838,7 @@ function PostActionsCell({
               {post.status === "OFFLINE" ? (
                 <>
                   <DropdownMenuItem onClick={() => setActiveAction("show")}>
-                    恢复
+                    上线
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveAction("delete")} variant="destructive">
                     删除
@@ -846,7 +847,7 @@ function PostActionsCell({
               ) : post.status === "LOCKED" ? (
                 <>
                   <DropdownMenuItem onClick={() => setActiveAction("unlock")}>
-                    开放
+                    开放回复
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
                     下线
@@ -858,7 +859,7 @@ function PostActionsCell({
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => setActiveAction("lock")}>
-                    关闭
+                    关闭回复
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveAction("hide")} variant="destructive">
                     下线
@@ -994,11 +995,11 @@ function PostActionsCell({
               <AdminPostActionButton
                 action="post.show"
                 targetId={post.id}
-                label="恢复"
-                modalTitle="确认恢复帖子"
+                label="上线"
+                modalTitle="确认上线帖子"
                 modalDescription={`帖子：${post.title}`}
-                placeholder="填写恢复说明（可选）"
-                confirmText="确认恢复"
+                placeholder="填写上线说明（可选）"
+                confirmText="确认上线"
                 className="h-7 rounded-full px-2.5 text-xs"
                 hideTrigger
                 open={activeAction === "show"}
@@ -1024,11 +1025,11 @@ function PostActionsCell({
               <AdminPostActionButton
                 action="post.unlock"
                 targetId={post.id}
-                label="开放"
-                modalTitle="确认开放帖子"
+                label="开放回复"
+                modalTitle="确认开放回复"
                 modalDescription={`帖子：${post.title}`}
-                placeholder="填写开放说明（可选）"
-                confirmText="确认开放"
+                placeholder="填写开放回复说明（可选）"
+                confirmText="确认开放回复"
                 className="h-7 rounded-full px-2.5 text-xs"
                 hideTrigger
                 open={activeAction === "unlock"}
@@ -1068,11 +1069,11 @@ function PostActionsCell({
               <AdminPostActionButton
                 action="post.lock"
                 targetId={post.id}
-                label="关闭"
-                modalTitle="确认关闭帖子"
+                label="关闭回复"
+                modalTitle="确认关闭回复"
                 modalDescription={`帖子：${post.title}`}
-                placeholder="填写关闭原因（可选）"
-                confirmText="确认关闭"
+                placeholder="填写关闭回复原因（可选）"
+                confirmText="确认关闭回复"
                 className="h-7 rounded-full px-2.5 text-xs"
                 hideTrigger
                 open={activeAction === "lock"}
@@ -1160,9 +1161,7 @@ function OverviewActionLink({
 }
 
 function getInitials(name: string) {
-  const normalized = name.trim()
-
-  return normalized.slice(0, 2).toUpperCase() || "NA"
+  return getAvatarFallback(name)
 }
 
 function getPostTitleAccentClassName(post: AdminPostListItem) {

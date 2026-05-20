@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 
 import { useFloatingPanel } from "@/components/refined-rich-post-editor/floating-panels"
-import type { EditorSelectionRange, FloatingPanelPosition, UploadSummary } from "@/components/refined-rich-post-editor/types"
+import type { EditorSelectionRange, FloatingPanelPosition, PrivateReplyRecipient, UploadSummary } from "@/components/refined-rich-post-editor/types"
 import { encodeBase64, inferMediaInsert, inferRemoteImageInsert, normalizeRemoteUrl } from "@/components/refined-rich-post-editor/utils"
 import type { UploadFileResult } from "@/hooks/use-image-upload"
 
@@ -36,6 +36,9 @@ type PanelDraftState = {
   linkText: string
   linkUrl: string
   base64Text: string
+  privateReplyText: string
+  privateReplyRecipient: PrivateReplyRecipient | null
+  encryptionMode: "base64" | "private"
 }
 
 const CLOSED_FLOATING_PANELS = {
@@ -60,6 +63,9 @@ const DEFAULT_PANEL_DRAFT: PanelDraftState = {
   linkText: "",
   linkUrl: "",
   base64Text: "",
+  privateReplyText: "",
+  privateReplyRecipient: null,
+  encryptionMode: "base64",
 }
 
 export function useEditorPanels({
@@ -220,6 +226,8 @@ export function useEditorPanels({
     setPanelDraft((current) => ({
       ...current,
       base64Text: value.slice(start, end),
+      privateReplyText: value.slice(start, end),
+      encryptionMode: "base64",
     }))
     setOpenPanels((current) => ({ ...current, base64: true }))
   }, [closeTransientPanels, selectionRef, value])
@@ -227,10 +235,13 @@ export function useEditorPanels({
   const closeBase64Dialog = useCallback(() => {
     setOpenPanels((current) => ({ ...current, base64: false }))
     setPanelDraft((current) => (
-      current.base64Text
+      current.base64Text || current.privateReplyText || current.privateReplyRecipient
         ? {
             ...current,
             base64Text: "",
+            privateReplyText: "",
+            privateReplyRecipient: null,
+            encryptionMode: "base64",
           }
         : current
     ))
@@ -479,7 +490,13 @@ export function useEditorPanels({
       open: openPanels.base64,
       value: panelDraft.base64Text,
       preview: base64Preview,
+      mode: panelDraft.encryptionMode,
+      privateValue: panelDraft.privateReplyText,
+      privateRecipient: panelDraft.privateReplyRecipient,
       setValue: (nextValue: string) => setPanelDraftValue("base64Text", nextValue),
+      setMode: (nextValue: "base64" | "private") => setPanelDraftValue("encryptionMode", nextValue),
+      setPrivateValue: (nextValue: string) => setPanelDraftValue("privateReplyText", nextValue),
+      setPrivateRecipient: (nextValue: PrivateReplyRecipient | null) => setPanelDraftValue("privateReplyRecipient", nextValue),
       openDialog: openBase64Dialog,
       closeDialog: closeBase64Dialog,
       dismissDialog: dismissBase64Dialog,

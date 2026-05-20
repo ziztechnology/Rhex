@@ -241,6 +241,38 @@ const writeGuardConfig = {
       parts: ["userId", "postId", "amount", "giftId"],
     },
   },
+  "rss-entry-like": {
+    description: "RSS 宇宙条目点赞切换限流，减少高频抖动写入。",
+    scope: "rss-entry-like",
+    cooldownMs: 500,
+    cooldownMessage: "点赞操作过于频繁，请稍后再试",
+    dedupe: {
+      windowMs: 1_000,
+      parts: ["userId", "entryId"],
+    },
+  },
+  "rss-entry-tip": {
+    description: "RSS 宇宙条目打赏防重，防止连点造成重复扣积分。",
+    scope: "rss-entry-tip",
+    cooldownMs: 1_500,
+    cooldownMessage: "打赏操作过于频繁，请稍后再试",
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 10_000,
+      parts: ["userId", "entryId", "amount", "giftId"],
+    },
+  },
+  "rss-source-application-create": {
+    description: "RSS 源收录申请防重，避免短时间重复提交同一订阅地址。",
+    scope: "rss-source-application-create",
+    cooldownMs: 3_000,
+    cooldownMessage: "提交过于频繁，请稍后再试",
+    releaseOnError: true,
+    dedupe: {
+      windowMs: 30_000,
+      parts: ["userId", "feedUrl"],
+    },
+  },
   "posts-auction-bid": {
     description: "拍卖出价防重，避免连点导致重复冻结或重复加价。",
     scope: "posts-auction-bid",

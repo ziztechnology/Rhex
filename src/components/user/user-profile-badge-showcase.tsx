@@ -74,7 +74,7 @@ export function UserProfileBadgeShowcase({ badges, className }: UserProfileBadge
                     svgClassName="[&>svg]:block"
                   />
                 </div>
-                <p className="line-clamp-2 min-w-0 text-[10px] font-semibold leading-4 text-muted-foreground">
+                <p className="w-full min-w-0 truncate text-[10px] font-semibold leading-4 text-muted-foreground">
                   {badge.name}
                 </p>
               </Link>

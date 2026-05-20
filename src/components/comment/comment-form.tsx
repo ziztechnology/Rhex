@@ -11,6 +11,7 @@ import { getClientPlatform, type ClientPlatform } from "@/lib/client-platform"
 import { COMMENT_LOAD_MODE_INFINITE, COMMENT_LOAD_MODE_PAGINATION, type CommentLoadMode } from "@/lib/comment-load-mode"
 import { buildCommentNavigationUrl } from "@/lib/comment-navigation"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
+import type { PrivateReplyRecipient } from "@/components/refined-rich-post-editor/types"
 import { dispatchPostReplyCreated } from "@/lib/post-discussion-events"
 import { cn } from "@/lib/utils"
 
@@ -25,6 +26,7 @@ interface CommentFormProps {
   replyToCommentId?: string
   compact?: boolean
   onCancel?: () => void
+  onSubmitted?: () => void
   disabledMessage?: string | null
   commentsVisibleToAuthorOnly?: boolean
   anonymousIdentityEnabled?: boolean
@@ -35,11 +37,12 @@ interface CommentFormProps {
   commentLoadMode?: CommentLoadMode
 }
 
-export function CommentForm({ postId, commentId, initialContent = "", mode = "create", editWindowMinutes = 5, parentId, replyToUserName, replyToCommentId, compact = false, onCancel, disabledMessage, commentsVisibleToAuthorOnly = false, anonymousIdentityEnabled = false, anonymousIdentityDefaultChecked = false, anonymousIdentitySwitchVisible = false, markdownEmojiMap, embedded = false, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION }: CommentFormProps) {
+export function CommentForm({ postId, commentId, initialContent = "", mode = "create", editWindowMinutes = 5, parentId, replyToUserName, replyToCommentId, compact = false, onCancel, onSubmitted, disabledMessage, commentsVisibleToAuthorOnly = false, anonymousIdentityEnabled = false, anonymousIdentityDefaultChecked = false, anonymousIdentitySwitchVisible = false, markdownEmojiMap, embedded = false, commentLoadMode = COMMENT_LOAD_MODE_PAGINATION }: CommentFormProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [content, setContent] = useState(initialContent)
+  const [privateReplyRecipient, setPrivateReplyRecipient] = useState<PrivateReplyRecipient | null>(null)
   const [useAnonymousIdentity, setUseAnonymousIdentity] = useState(anonymousIdentityDefaultChecked)
   const [message, setMessage] = useState("")
   const [loading, setLoading] = useState(false)
@@ -48,7 +51,10 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
 
   useEffect(() => {
     setContent(initialContent)
-  }, [initialContent])
+    if (mode === "edit") {
+      setPrivateReplyRecipient(null)
+    }
+  }, [initialContent, mode])
 
   useEffect(() => {
     setUseAnonymousIdentity(anonymousIdentityDefaultChecked)
@@ -72,7 +78,9 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
     }
   }, [mode, replyToUserName])
 
-  const helperMessage = commentsVisibleToAuthorOnly
+  const helperMessage = privateReplyRecipient
+    ? `本次回复仅 ${privateReplyRecipient.displayName} 和你本人可见。`
+    : commentsVisibleToAuthorOnly
     ? "当前帖子开启了评论仅楼主可见，你的评论仅楼主、管理员和你自己可见。"
     : "可使用 @用户名 提及他人。"
   const primaryShortcutKey = shortcutPlatform === "mac" ? "Cmd" : "Ctrl"
@@ -123,6 +131,7 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
         parentId,
         replyToUserName,
         replyToCommentId,
+        privateRecipientUserId: privateReplyRecipient?.id ?? null,
         useAnonymousIdentity,
         commentView: searchParams.get("view") === "flat" ? "flat" : "tree",
       }),
@@ -140,6 +149,7 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
 
     if (mode !== "edit") {
       setContent("")
+      setPrivateReplyRecipient(null)
     }
 
     const successMessage = mode === "edit" ? "评论修改成功" : parentId ? "回复提交成功" : "评论提交成功"
@@ -167,6 +177,7 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
     }
 
     onCancel?.()
+    onSubmitted?.()
 
     if (typeof result.data?.id === "string") {
       dispatchPostReplyCreated({
@@ -206,6 +217,16 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
         markdownEmojiMap={markdownEmojiMap}
         placeholder={mode === "edit" ? `修改评论内容…可在 ${editWindowMinutes} 分钟内编辑` : replyToUserName ? `回复 @${replyToUserName}…` : "写下你的回复…支持 @用户名 提及"}
         shellClassName={embedded ? "rounded-none border-0 bg-transparent shadow-none" : undefined}
+        privateReplyPostId={postId}
+        privateReplyRecipient={mode === "create" ? privateReplyRecipient : null}
+        onPrivateReplyInsert={mode === "create"
+          ? ({ recipient, content: nextContent }) => {
+              setPrivateReplyRecipient(recipient)
+              setContent(nextContent)
+              setExpanded(true)
+            }
+          : undefined}
+        onClearPrivateReply={mode === "create" ? () => setPrivateReplyRecipient(null) : undefined}
       />
       <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", embedded && "px-4")}>
         {message ? (
@@ -234,12 +255,13 @@ export function CommentForm({ postId, commentId, initialContent = "", mode = "cr
             <Button type="button" variant="ghost" onClick={() => {
               setExpanded(false)
               setContent(initialContent)
+              setPrivateReplyRecipient(null)
               onCancel?.()
             }}>
               取消
             </Button>
           ) : null}
-          <Button disabled={loading || Boolean(disabledMessage)}>{loading ? "提交中..." : mode === "edit" ? "保存修改" : parentId ? "提交回复" : "提交评论"}</Button>
+          <Button disabled={loading || Boolean(disabledMessage)}>{loading ? "提交中..." : mode === "edit" ? "保存修改" : privateReplyRecipient ? "发布私密回复" : parentId ? "提交回复" : "提交评论"}</Button>
         </div>
       </div>
     </form>

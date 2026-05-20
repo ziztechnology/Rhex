@@ -54,12 +54,23 @@ export function ActionsTab({
               columnsClassName="sm:grid-cols-3"
               items={[
                 { label: "当前状态", value: activeUser.status },
+                { label: "自动解除", value: activeUser.statusExpiresAt ? formatDateTime(activeUser.statusExpiresAt) : "永久 / 无" },
                 { label: "注册时间", value: formatDateTime(activeUser.createdAt) },
                 { label: "最近登录", value: activeUser.lastLoginAt ? formatDateTime(activeUser.lastLoginAt) : "从未登录" },
               ]}
             />
           </div>
           <div className="mt-4 flex flex-col gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">自动解除时间</span>
+              <Input
+                type="datetime-local"
+                value={account.state.statusExpiresAtDraft}
+                onChange={(event) => account.setStatusExpiresAtDraft(event.target.value)}
+                className="h-10 rounded-full bg-background"
+              />
+              <span className="text-xs text-muted-foreground">仅对禁言和拉黑生效，不填写则永久。</span>
+            </label>
             <TextAreaField label="操作备注" value={account.state.statusMessage} onChange={account.setStatusMessage} placeholder="记录禁言、恢复或拉黑原因" rows={4} />
             <ActionButtons
               items={[

@@ -100,6 +100,7 @@ function normalizeNavigationLink(
     item: {
       label,
       href,
+      icon: normalizeOptionalString(value.icon),
     },
     placement,
   } satisfies ResolvedAddonFooterLinkEntry & {
@@ -209,6 +210,7 @@ export async function mergeAddonNavigationLinks(input: {
       ...footerLinks.map((item) => ({
         label: item.item.label,
         href: item.item.href,
+        icon: item.item.icon,
       })),
     ],
   }

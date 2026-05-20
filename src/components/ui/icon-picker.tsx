@@ -49,6 +49,7 @@ interface IconPickerProps {
   uploadFolder?: "avatars" | "posts" | "comments" | "friend-links" | "site-logo" | "icon"
   hideLabel?: boolean
   triggerMode?: "full" | "icon"
+  allowEmpty?: boolean
 }
 
 export function IconPicker({
@@ -66,6 +67,7 @@ export function IconPicker({
   uploadFolder = "icon",
   hideLabel = false,
   triggerMode = "full",
+  allowEmpty = false,
 }: IconPickerProps) {
   const [open, setOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -132,13 +134,17 @@ export function IconPicker({
                 : "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground/80"
             }
           >
-            <LevelIcon
-              icon={normalizedValue}
-              color={previewColor}
-              className="h-4 w-4 text-sm"
-              emojiClassName="text-inherit"
-              svgClassName="[&>svg]:block"
-            />
+            {allowEmpty && !normalizedValue ? (
+              <span className="text-[10px] text-muted-foreground">无</span>
+            ) : (
+              <LevelIcon
+                icon={normalizedValue}
+                color={previewColor}
+                className="h-4 w-4 text-sm"
+                emojiClassName="text-inherit"
+                svgClassName="[&>svg]:block"
+              />
+            )}
           </span>
           {triggerMode === "icon" ? null : (
             <span className="min-w-0 flex-1 truncate">
@@ -167,13 +173,17 @@ export function IconPicker({
               <p className="text-[11px] font-medium text-muted-foreground">
                 自定义图标
               </p>
-              <LevelIcon
-                icon={normalizedValue}
-                color={previewColor}
-                className="h-4 w-4 text-sm"
-                emojiClassName="text-inherit"
-                svgClassName="[&>svg]:block"
-              />
+              {allowEmpty && !normalizedValue ? (
+                <span className="text-[11px] text-muted-foreground">无图标</span>
+              ) : (
+                <LevelIcon
+                  icon={normalizedValue}
+                  color={previewColor}
+                  className="h-4 w-4 text-sm"
+                  emojiClassName="text-inherit"
+                  svgClassName="[&>svg]:block"
+                />
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

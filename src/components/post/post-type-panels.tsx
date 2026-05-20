@@ -380,14 +380,16 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
                     key={`${participant.userId}:${participant.joinedAt}`}
                     className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background py-1 pl-1 pr-1"
                   >
-                    <UserAvatar
-                      name={participant.nickname ?? participant.username}
-                      avatarPath={participant.avatarPath}
-                      size="xs"
-                    />
-                    <span className="max-w-28 truncate text-[11px] font-medium text-foreground sm:max-w-32">
-                      {participant.nickname ?? participant.username}
-                    </span>
+                    <Link href={`/users/${participant.username}`} className="group inline-flex min-w-0 items-center gap-1.5 rounded-full hover:text-primary">
+                      <UserAvatar
+                        name={participant.nickname ?? participant.username}
+                        avatarPath={participant.avatarPath}
+                        size="xs"
+                      />
+                      <span className="max-w-28 truncate text-[11px] font-medium text-foreground transition-colors group-hover:text-primary sm:max-w-32">
+                        {participant.nickname ?? participant.username}
+                      </span>
+                    </Link>
                   </div>
                 ))}
                 {participantTotal > lottery.participantPreviews.length ? (
@@ -604,10 +606,10 @@ export function LotteryPanel({ postId, isOwnerOrAdmin, lottery }: LotteryPanelPr
                 <TableRow key={item.id}>
                   <TableCell>{formatDateTime(item.joinedAt)}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <Link href={`/users/${item.username}`} className="flex w-fit items-center gap-2 transition-colors hover:text-primary">
                       <UserAvatar name={item.nickname ?? item.username} avatarPath={item.avatarPath} size="xs" />
                       <span>{item.nickname ?? item.username}</span>
-                    </div>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

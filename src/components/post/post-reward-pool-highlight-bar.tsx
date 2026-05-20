@@ -41,8 +41,8 @@ export function PostRewardPoolHighlightBar({
 
   const isJackpot = activeSummary.rewardMode === "JACKPOT"
   const wrapperClassName = isJackpot
-    ? "border-amber-200/80 bg-linear-to-r from-amber-50 via-orange-50 to-yellow-50 text-amber-950 dark:border-amber-950/80 dark:bg-[linear-gradient(135deg,rgba(24,20,16,0.985),rgba(39,31,20,0.96),rgba(21,18,16,0.985))] dark:text-amber-100"
-    : "border-rose-200/80 bg-linear-to-r from-rose-50 via-orange-50 to-amber-50 text-rose-950 dark:border-rose-950/80 dark:bg-[linear-gradient(135deg,rgba(25,19,19,0.985),rgba(43,24,24,0.96),rgba(23,18,17,0.985))] dark:text-rose-100"
+    ? "bg-linear-to-r from-amber-50 via-orange-50 to-yellow-50 text-amber-950 ring-1 ring-amber-200/80 dark:bg-[linear-gradient(135deg,rgba(24,20,16,0.985),rgba(39,31,20,0.96),rgba(21,18,16,0.985))] dark:text-amber-100 dark:ring-amber-950/80"
+    : "bg-linear-to-r from-rose-50 via-orange-50 to-amber-50 text-rose-950 ring-1 ring-rose-200/80 dark:bg-[linear-gradient(135deg,rgba(25,19,19,0.985),rgba(43,24,24,0.96),rgba(23,18,17,0.985))] dark:text-rose-100 dark:ring-rose-950/80"
   const iconWrapClassName = isJackpot
     ? "bg-amber-500/12 text-amber-700 shadow-amber-200/70 dark:bg-amber-500/10 dark:text-amber-200 dark:shadow-black/30"
     : "bg-rose-500/12 text-rose-700 shadow-rose-200/70 dark:bg-rose-500/10 dark:text-rose-200 dark:shadow-black/30"
@@ -64,8 +64,8 @@ export function PostRewardPoolHighlightBar({
   return (
     <div
       className={cn(
-        "relative overflow-hidden border px-4 py-3   sm:px-5 sm:py-3.5",
-        attachedTop ? "rounded-t-none border-t-0" : "rounded-t-[24px]",
+        "relative overflow-hidden px-4 py-3 sm:px-5 sm:py-3.5",
+        attachedTop ? "rounded-t-none" : "rounded-t-[24px]",
         attachedBottom ? "rounded-b-none" : "rounded-b-[24px]",
         wrapperClassName,
         className,

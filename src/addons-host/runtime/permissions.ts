@@ -32,6 +32,7 @@ export const ADDON_RUNTIME_PERMISSIONS = [
   "comment:like",
   "message:send",
   "notification:create",
+  "email:send",
   "follow:user",
   "points:adjust",
   "badge:query",

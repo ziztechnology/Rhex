@@ -4,7 +4,7 @@ import { useCallback } from "react"
 import type * as React from "react"
 import type { MutableRefObject, RefObject } from "react"
 
-import type { EditorSelectionRange } from "@/components/refined-rich-post-editor/types"
+import type { EditorSelectionRange, PrivateReplyRecipient } from "@/components/refined-rich-post-editor/types"
 import { inferMediaInsert, inferRemoteImageInsert } from "@/components/refined-rich-post-editor/utils"
 import {
   applyAlignment,
@@ -46,6 +46,9 @@ type UseEditorCommandsOptions = {
   linkText: string
   linkUrl: string
   base64Preview: string
+  privateReplyText: string
+  privateReplyRecipient: PrivateReplyRecipient | null
+  onPrivateReplyInsert?: (payload: { recipient: PrivateReplyRecipient; content: string }) => void
   setMessage: (message: string) => void
   toggleLinkPanel: () => void
   toggleTablePanel: () => void
@@ -77,6 +80,9 @@ export function useEditorCommands({
   linkText,
   linkUrl,
   base64Preview,
+  privateReplyText,
+  privateReplyRecipient,
+  onPrivateReplyInsert,
   setMessage,
   toggleLinkPanel,
   toggleTablePanel,
@@ -240,6 +246,31 @@ export function useEditorCommands({
     closeBase64Dialog()
   }, [applyEditorUpdate, base64Preview, closeBase64Dialog, selectionRef, setMessage, value])
 
+  const handleInsertPrivateReply = useCallback(() => {
+    if (!onPrivateReplyInsert) {
+      setMessage("当前编辑器不支持私密回复")
+      return
+    }
+
+    if (!privateReplyRecipient) {
+      setMessage("请选择私密回复可见人")
+      return
+    }
+
+    const normalizedContent = privateReplyText.trim()
+    if (!normalizedContent) {
+      setMessage("请输入私密回复内容")
+      return
+    }
+
+    onPrivateReplyInsert({
+      recipient: privateReplyRecipient,
+      content: normalizedContent,
+    })
+    setMessage(`已设置为仅 ${privateReplyRecipient.displayName} 可见`)
+    closeBase64Dialog()
+  }, [closeBase64Dialog, onPrivateReplyInsert, privateReplyRecipient, privateReplyText, setMessage])
+
   const handleUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!markdownImageUploadEnabled) {
       event.target.value = ""
@@ -305,6 +336,7 @@ export function useEditorCommands({
     handleInsertLink,
     handleInsertTable,
     handleInsertBase64,
+    handleInsertPrivateReply,
     toolbarActions: {
       setHeadingLevel: (level: 1 | 2 | 3) => applyEditorUpdate(setHeadingLevel(getEditorState(), level)),
       bold: () => applyWrap("**", "**"),

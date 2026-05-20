@@ -120,7 +120,7 @@ export default async function BadgeDetailPage(props: BadgeDetailPageProps) {
                       Badge Detail
                     </p>
                     <div
-                      className="mx-auto mt-5 flex h-28 w-28 items-center justify-center rounded-[32px] text-6xl sm:h-32 sm:w-32"
+                      className="mx-auto mt-5 flex h-28 w-fit min-w-28 max-w-full items-center justify-center rounded-[32px] px-5 text-6xl sm:h-32 sm:min-w-32 sm:px-6"
                       style={{
                         color: badge.color,
                         background: `linear-gradient(180deg, ${badge.color}20, ${badge.color}10)`,
@@ -129,7 +129,7 @@ export default async function BadgeDetailPage(props: BadgeDetailPageProps) {
                       <LevelIcon
                         icon={badge.iconText}
                         color={badge.color}
-                        className="h-14 w-14 text-[56px] sm:h-16 sm:w-16 sm:text-[64px]"
+                        className="h-14 min-w-14 max-w-full text-[56px] sm:h-16 sm:min-w-16 sm:text-[64px]"
                         emojiClassName="text-inherit"
                         svgClassName="[&>svg]:block"
                       />

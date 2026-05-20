@@ -22,6 +22,7 @@ import { countUserRepliesByPostId } from "@/db/comment-queries"
 import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { POINT_LOG_EVENT_TYPES } from "@/lib/point-log-events"
 import { getSiteSettings, type SiteSettingsData } from "@/lib/site-settings"
+import { isPublicReadablePostStatus } from "@/lib/post-types"
 import { isHttpUrl } from "@/lib/shared/url"
 import { isVipActive, type VipStateSource } from "@/lib/vip-status"
 import { normalizeUploadExtension } from "@/lib/upload-rules"
@@ -584,7 +585,7 @@ async function loadAttachmentAccessContext(params: {
     && (params.currentUser.id === attachment.post.authorId || params.currentUser.role === "ADMIN"),
   )
 
-  if (attachment.post.status !== "NORMAL" && !isOwnerOrAdmin) {
+  if (!isPublicReadablePostStatus(attachment.post.status) && !isOwnerOrAdmin) {
     apiError(404, "附件当前不可访问")
   }
 
@@ -662,7 +663,7 @@ export async function purchasePostAttachment(input: {
   return prisma.$transaction(async (tx) => {
     const attachment = await findPostAttachmentById(input.attachmentId, tx)
 
-    if (!attachment || attachment.post.status !== "NORMAL") {
+    if (!attachment || !isPublicReadablePostStatus(attachment.post.status)) {
       apiError(404, "附件不存在或当前不可购买")
     }
 

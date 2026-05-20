@@ -182,8 +182,8 @@ export function BadgeCenter({ badges, isLoggedIn }: BadgeCenterProps) {
               <div className="p-4" style={{ background: `linear-gradient(135deg, ${badge.color}22 0%, transparent 100%)` }}>
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
                   <Link href={`/badges/${badge.code}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] text-2xl" style={{ color: badge.color, backgroundColor: `${badge.color}14` }}>
-                      <LevelIcon icon={badge.iconText} color={badge.color} className="h-5.5 w-5.5 text-[22px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+                    <div className="flex h-11 min-w-11 max-w-32 shrink-0 items-center justify-center rounded-[18px] px-2 text-2xl" style={{ color: badge.color, backgroundColor: `${badge.color}14` }}>
+                      <LevelIcon icon={badge.iconText} color={badge.color} className="h-5.5 min-w-5.5 max-w-28 text-[22px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
                     </div>
 
                     <div className="min-w-0 flex-1">

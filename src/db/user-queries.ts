@@ -1,7 +1,9 @@
 import { prisma } from "@/db/client"
 import type { Prisma } from "@/db/types"
 import { postListInclude } from "@/db/queries"
+import { normalizeExpiredUserRestrictionByUsername } from "@/db/user-status-queries"
 import type { TimestampCursorPayload } from "@/lib/cursor-pagination"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export const userProfileSelect = {
   id: true,
@@ -15,6 +17,7 @@ export const userProfileSelect = {
   avatarPath: true,
   gender: true,
   status: true,
+  statusExpiresAt: true,
   level: true,
   points: true,
   vipLevel: true,
@@ -48,10 +51,7 @@ export const userProfileSelect = {
 } satisfies Prisma.UserSelect
 
 export function findUserProfileByUsername(username: string) {
-  return prisma.user.findUnique({
-    where: { username },
-    select: userProfileSelect,
-  })
+  return normalizeExpiredUserRestrictionByUsername(username, userProfileSelect)
 }
 
 export function findUserPostsByUsername(username: string, options: { skip?: number; take?: number } = {}) {
@@ -59,7 +59,7 @@ export function findUserPostsByUsername(username: string, options: { skip?: numb
 
   return prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       isAnonymous: false,
       author: {
         username,
@@ -79,7 +79,7 @@ function buildVisibleUserRepliesWhere(username: string): Prisma.CommentWhereInpu
       username,
     },
     post: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       OR: [
         { isAnonymous: false },
         {
@@ -139,7 +139,7 @@ export function findUserRepliesByUsername(username: string, options: { skip?: nu
 export function countUserPosts(userId: number) {
   return prisma.post.count({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       authorId: userId,
     },
   })
@@ -148,7 +148,7 @@ export function countUserPosts(userId: number) {
 export function countUserPublicPostsByUsername(username: string) {
   return prisma.post.count({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       isAnonymous: false,
       author: {
         username,
@@ -185,7 +185,7 @@ export async function findUserPostsByIdCursor(params: { userId: number; pageSize
 
   const rows = await prisma.post.findMany({
     where: {
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       authorId: params.userId,
       ...(cursor ? buildTimestampCursorWhere("id", "createdAt", cursor, pagingDirection) : {}),
     },
@@ -338,7 +338,7 @@ export function countUserLikedPosts(userId: number) {
       userId,
       targetType: "POST",
       post: {
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       },
     },
   })
@@ -354,7 +354,7 @@ export async function findUserLikedPostsByIdCursor(params: { userId: number; pag
       userId: params.userId,
       targetType: "POST",
       post: {
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       },
       ...(cursor ? buildTimestampCursorWhere("id", "createdAt", cursor, pagingDirection) : {}),
     },

@@ -6,6 +6,7 @@ import {
   FileCode2,
   Flag,
   LayoutGrid,
+  ListChecks,
   Logs,
   Mail,
   Megaphone,
@@ -38,7 +39,7 @@ export type AdminTabKey =
   | "security"
   | "settings"
 
-export type AdminNavKey = AdminTabKey | "apps"
+export type AdminNavKey = AdminTabKey | "apps" | "tasks"
 
 export type AdminSettingsSectionKey =
   | "profile"
@@ -158,7 +159,7 @@ export const adminSettingsGroups = [
       { key: "profile", label: "基础信息" },
       { key: "markdown-emoji", label: "Markdown 表情" },
       { key: "footer-links", label: "页脚导航" },
-      { key: "apps", label: "应用导航" },
+      { key: "apps", label: "顶部导航" },
     ],
   },
   {
@@ -289,6 +290,15 @@ export const adminNavigation: AdminNavigationItem[] = [
     label: "勋章系统",
     description: "勋章规则、展示与效果。",
     icon: Sparkles,
+    group: "system",
+    adminOnly: true,
+  },
+  {
+    key: "tasks",
+    href: getAdminSettingsHref("vip", "tasks"),
+    label: "任务系统",
+    description: "配置任务条件、周期和积分奖励。",
+    icon: ListChecks,
     group: "system",
     adminOnly: true,
   },

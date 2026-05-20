@@ -15,7 +15,7 @@ export function getAvatarFallback(name: string) {
   }
 
   const characters = Array.from(trimmed.replace(/\s+/g, ""))
-  const fallback = characters.length > 2 ? characters[0] : characters.join("")
+  const fallback = characters[0]
 
   return (fallback || "U").toUpperCase()
 }

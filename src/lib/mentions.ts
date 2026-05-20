@@ -1,8 +1,20 @@
 import { findUsersByMentionTexts } from "@/db/mention-queries"
+import {
+  createUserLinkToken,
+  getUserLinkRanges,
+  isUserLinkToken,
+  renderUserLinkTokens,
+  stripUserLinkTokens,
+} from "@/lib/mention-token"
 
 const MENTION_BOUNDARY_CJK = "\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}"
 const MENTION_PATTERN = new RegExp(`(^|[^\\S\\r\\n]|[\\p{P}\\p{S}]|[${MENTION_BOUNDARY_CJK}])@([^\\s@]{1,20})`, "gu")
-const USER_LINK_PATTERN = /\[userLink:([^\]\r\n:]+):([^\]\r\n:]+)\]/gu
+export {
+  createUserLinkToken,
+  isUserLinkToken,
+  renderUserLinkTokens,
+  stripUserLinkTokens,
+}
 
 export interface MentionUser {
   id: number
@@ -23,50 +35,8 @@ function normalizeMentionText(value: string) {
   return value.trim()
 }
 
-export function createUserLinkToken(displayName: string, username: string) {
-  const normalizedDisplayName = displayName.trim().replace(/[\]\r\n:]/g, "")
-  const normalizedUsername = username.trim().replace(/[\]\r\n:]/g, "")
-
-  if (!normalizedDisplayName || !normalizedUsername) {
-    return ""
-  }
-
-  return `[userLink:${normalizedDisplayName}:${normalizedUsername}]`
-}
-
-export function isUserLinkToken(value: string) {
-  USER_LINK_PATTERN.lastIndex = 0
-  return USER_LINK_PATTERN.test(value)
-}
-
-function getUserLinkRanges(content: string) {
-  const ranges: Array<{ start: number; end: number }> = []
-  let match: RegExpExecArray | null
-
-  USER_LINK_PATTERN.lastIndex = 0
-  while ((match = USER_LINK_PATTERN.exec(content)) !== null) {
-    ranges.push({
-      start: match.index,
-      end: match.index + match[0].length,
-    })
-  }
-
-  USER_LINK_PATTERN.lastIndex = 0
-  return ranges
-}
-
 function isInsideRanges(index: number, ranges: Array<{ start: number; end: number }>) {
   return ranges.some((range) => index >= range.start && index < range.end)
-}
-
-export function stripUserLinkTokens(content: string) {
-  USER_LINK_PATTERN.lastIndex = 0
-  return content.replace(USER_LINK_PATTERN, (_matched, displayName: string) => `@${displayName}`)
-}
-
-export function renderUserLinkTokens(content: string) {
-  USER_LINK_PATTERN.lastIndex = 0
-  return content.replace(USER_LINK_PATTERN, (_matched, displayName: string, username: string) => `[@${displayName}](/users/${encodeURIComponent(username)})`)
 }
 
 export function extractMentionTexts(content: string) {

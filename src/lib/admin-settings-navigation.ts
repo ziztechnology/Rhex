@@ -40,7 +40,7 @@ const adminSettingsSectionDetails: Record<
     subTabs: [],
   },
   apps: {
-    label: "应用导航",
+    label: "顶部导航",
     subTabs: [],
   },
   registration: {

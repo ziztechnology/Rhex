@@ -532,8 +532,8 @@ export function AdminBadgeManager({ initialBadges, initialLevelDefinitions }: Ad
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl" style={{ backgroundColor: `${badge.color}18`, color: badge.color }}>
-                          <LevelIcon icon={badge.iconText} color={badge.color} className="h-5 w-5 text-[20px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
+                        <div className="flex h-11 min-w-11 max-w-32 shrink-0 items-center justify-center rounded-2xl px-2 text-xl" style={{ backgroundColor: `${badge.color}18`, color: badge.color }}>
+                          <LevelIcon icon={badge.iconText} color={badge.color} className="h-5 min-w-5 max-w-28 text-[20px]" emojiClassName="text-inherit" svgClassName="[&>svg]:block" />
                         </div>
 
                         <div className="min-w-0">

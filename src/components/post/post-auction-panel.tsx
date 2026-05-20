@@ -53,6 +53,7 @@ export function PostAuctionPanel({
   const [participantItems, setParticipantItems] = useState<Array<{
     id: string
     userId: number
+    username: string
     userName: string
     createdAt: string
     amount: number | null
@@ -272,14 +273,16 @@ export function PostAuctionPanel({
                         : "border-border",
                     )}
                   >
-                    <UserAvatar
-                      name={participant.userName}
-                      avatarPath={participant.avatarPath}
-                      size="xs"
-                      isVip={participant.isVip}
-                      vipLevel={participant.vipLevel}
-                    />
-                    <span className="max-w-28 truncate text-[11px] font-medium text-foreground sm:max-w-32">{participant.userName}</span>
+                    <Link href={`/users/${participant.username}`} className="group inline-flex min-w-0 items-center gap-1.5 rounded-full">
+                      <UserAvatar
+                        name={participant.userName}
+                        avatarPath={participant.avatarPath}
+                        size="xs"
+                        isVip={participant.isVip}
+                        vipLevel={participant.vipLevel}
+                      />
+                      <span className="max-w-28 truncate text-[11px] font-medium text-foreground transition-colors group-hover:text-primary sm:max-w-32">{participant.userName}</span>
+                    </Link>
                     {showBidAmounts && participant.amount !== null ? (
                       <span
                         className={cn(
@@ -455,7 +458,11 @@ export function PostAuctionPanel({
               {participantItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>{formatDateTime(item.createdAt)}</TableCell>
-                  <TableCell>{item.userName}</TableCell>
+                  <TableCell>
+                    <Link href={`/users/${item.username}`} className="font-medium text-foreground transition-colors hover:text-primary">
+                      {item.userName}
+                    </Link>
+                  </TableCell>
                   {showBidAmounts ? <TableCell className="text-right">{item.amount !== null ? `${formatNumber(item.amount)} ${pointName}` : "-"}</TableCell> : null}
                 </TableRow>
               ))}

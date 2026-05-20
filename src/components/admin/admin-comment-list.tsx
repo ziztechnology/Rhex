@@ -54,6 +54,7 @@ import {
 import { Tooltip } from "@/components/ui/tooltip"
 import { toast } from "@/components/ui/toast"
 import type { AdminCommentListItem, AdminCommentListResult } from "@/lib/admin-comment-management"
+import { getAvatarFallback } from "@/lib/avatar"
 import { formatDateTime, formatMonthDayTime, formatNumber } from "@/lib/formatters"
 import { getPostCommentPath } from "@/lib/post-links"
 import { cn } from "@/lib/utils"
@@ -808,9 +809,7 @@ function OverviewActionLink({
 }
 
 function getInitials(name: string) {
-  const normalized = name.trim()
-
-  return normalized.slice(0, 2).toUpperCase() || "NA"
+  return getAvatarFallback(name)
 }
 
 function getCommentStatusBadgeClassName(

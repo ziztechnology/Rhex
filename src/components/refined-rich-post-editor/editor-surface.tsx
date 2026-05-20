@@ -1,14 +1,16 @@
 "use client"
 
 import React from "react"
-import { Bold, CircleHelp, EyeOff, Highlighter, ImageIcon, Link2, Maximize2, Minimize2, Quote, SeparatorHorizontal, Smile, Strikethrough, Table2, Underline, Video } from "lucide-react"
+import { Bold, CircleHelp, EyeOff, Highlighter, ImageIcon, Link2, Lock, Maximize2, Minimize2, Quote, SeparatorHorizontal, Smile, Strikethrough, Table2, Underline, Video, X } from "lucide-react"
 
 import { AddonEditorToolbarItemHost } from "@/components/addon-editor-toolbar-item"
 import { EDITOR_LINE_HEIGHT_REM, EDITOR_LINE_NUMBER_GUTTER_WIDTH_CLASS, TOOLBAR_TIPS } from "@/components/refined-rich-post-editor/constants"
 import { AlignmentSelect, CodeFormatSelect, HeadingSelect, ListSelect, ToolButton } from "@/components/refined-rich-post-editor/toolbar-controls"
 import type {
+  EditorSelectionRange,
   EditorSelectionStore,
   ToolbarTipDefinition,
+  PrivateReplyRecipient,
 } from "@/components/refined-rich-post-editor/types"
 import { MarkdownContentClient as MarkdownContent } from "@/components/markdown-content-client"
 import type {
@@ -120,7 +122,7 @@ type EditorBodyProps = {
   lineHeights: number[]
   activeLineNumber: number
   editorScrollTop: number
-  onChange: (value: string) => void
+  onChange: (value: string, selection?: EditorSelectionRange) => void
   onEditorScrollSync: (scrollTop: number) => void
   onScroll: (event: React.UIEvent<HTMLTextAreaElement>) => void
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void
@@ -195,7 +197,12 @@ export function EditorBody({
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value, {
+            start: event.currentTarget.selectionStart,
+            end: event.currentTarget.selectionEnd,
+          })
+        }}
         onScroll={(event) => {
           if (scrollSyncSourceRef.current === "preview") {
             return
@@ -381,6 +388,7 @@ type EditorToolbarProps = {
   onOpenBase64Dialog: () => void
   onOpenHelpDialog: () => void
   onUpload: (event: React.ChangeEvent<HTMLInputElement>) => Promise<void>
+  privateReplyRecipient?: PrivateReplyRecipient | null
 }
 
 export function EditorToolbar({
@@ -432,6 +440,7 @@ export function EditorToolbar({
   onOpenBase64Dialog,
   onOpenHelpDialog,
   onUpload,
+  privateReplyRecipient,
 }: EditorToolbarProps) {
   const selection = React.useSyncExternalStore(
     selectionStore.subscribe,
@@ -530,11 +539,8 @@ export function EditorToolbar({
           </ToolButton>
           <input ref={fileInputRef} accept="image/*" multiple className="hidden" type="file" onChange={onUpload} disabled={disabled || !markdownImageUploadEnabled || uploading} />
         </div>
-        <ToolButton tip={TOOLBAR_TIPS.base64} platform={platform} onMouseDown={onToolbarMouseDown} onClick={onOpenBase64Dialog} disabled={disabled} active={showBase64Dialog}>
-          <svg className="h-4 w-4 fill-current" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-            <path d="M192 608H96v320H192A96.64 96.64 0 0 0 288 832a94.08 94.08 0 0 0-26.88-64 94.08 94.08 0 0 0 26.88-64A96.64 96.64 0 0 0 192 608z m0 256h-32v-64H192a32 32 0 0 1 0 64z m0-128h-32v-64H192a32 32 0 0 1 0 64z m462.08 0c-26.88-13.44-46.08-23.68-46.08-36.48a36.48 36.48 0 0 1 7.68-22.4 31.36 31.36 0 0 1 24.32-5.12h90.88a90.88 90.88 0 0 0-90.88-64 94.08 94.08 0 0 0-71.68 28.16A99.84 99.84 0 0 0 544 704c0 51.84 47.36 74.88 81.92 92.16s46.08 23.68 46.08 36.48a40.96 40.96 0 0 1-8.96 23.68 28.16 28.16 0 0 1-23.04 7.68H549.76a96 96 0 0 0 21.76 37.76 92.8 92.8 0 0 0 68.48 26.24 94.08 94.08 0 0 0 68.48-26.24A104.32 104.32 0 0 0 736 832c0-52.48-47.36-76.16-81.92-93.44z m305.92-64v-64h-192v320h192v-64h-128v-64h64v-64h-64v-64z m-544-64A96.64 96.64 0 0 0 320 704v224h64v-64h64v64h64V704a96.64 96.64 0 0 0-96-96z m32 192H384V704a32 32 0 0 1 64 0zM480 448A96.64 96.64 0 0 0 384 352a104.96 104.96 0 0 0-32 5.76V320a32 32 0 0 1 32-32h90.24A96 96 0 0 0 288 320v128a96 96 0 0 0 192 0z m-128 0a32 32 0 1 1 32 32 32 32 0 0 1-32-32zM640 544h64v-320h-64v128H576v-128H512V384a32 32 0 0 0 32 32H640z" />
-            <path d="M192 544V192a32 32 0 0 1 32-32h512V256H832v288h64v-320l-128-128H224A96 96 0 0 0 128 192v352z" />
-          </svg>
+        <ToolButton tip={TOOLBAR_TIPS.base64} platform={platform} onMouseDown={onToolbarMouseDown} onClick={onOpenBase64Dialog} disabled={disabled} active={showBase64Dialog || Boolean(privateReplyRecipient)}>
+          <Lock className="h-4 w-4" />
         </ToolButton>
         <ToolButton tip={TOOLBAR_TIPS.help} platform={platform} onMouseDown={onToolbarMouseDown} onClick={onOpenHelpDialog} disabled={disabled}>
           <CircleHelp className="h-4 w-4" />
@@ -551,6 +557,40 @@ export function EditorToolbar({
             value={value}
           />
         ))}
+      </div>
+    </div>
+  )
+}
+
+export function PrivateReplyDraftBanner({
+  recipient,
+  onClear,
+}: {
+  recipient?: PrivateReplyRecipient | null
+  onClear?: () => void
+}) {
+  if (!recipient) {
+    return null
+  }
+
+  return (
+    <div className="px-3 pt-3 sm:px-5">
+      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground">
+        <Lock className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">
+          私密回复给 <strong>{recipient.displayName}</strong>
+        </span>
+        {onClear ? (
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+            onClick={onClear}
+            aria-label="取消私密回复"
+            title="取消私密回复"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     </div>
   )

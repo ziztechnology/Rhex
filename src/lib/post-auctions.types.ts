@@ -24,6 +24,7 @@ export interface PostAuctionVisibleBidRecord {
 
 export interface PostAuctionParticipantPreview {
   userId: number
+  username: string
   userName: string
   avatarPath: string | null
   isVip: boolean
@@ -35,6 +36,7 @@ export interface PostAuctionParticipantPreview {
 export interface PostAuctionParticipantPageItem {
   id: string
   userId: number
+  username: string
   userName: string
   createdAt: string
   amount: number | null

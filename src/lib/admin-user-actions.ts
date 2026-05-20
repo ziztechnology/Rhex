@@ -33,6 +33,7 @@ import {
   type AdminActionDefinition,
 } from "@/lib/admin-action-types"
 import { getBlockedUserStatusChangeMessage, type RestrictiveUserStatus } from "@/lib/admin-user-status-guard"
+import { formatBrowserLocalDateTimeInput, parseBrowserLocalDateTime } from "@/lib/browser-local-datetime"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { parseBusinessDateTime } from "@/lib/formatters"
 import { ensureCanModerateUser, isScopedModerator, isSiteAdmin } from "@/lib/moderator-permissions"
@@ -75,18 +76,62 @@ function ensureCanApplyRestrictiveStatus(user: UserStatusRecord, status: Restric
   if (blockedMessage) apiError(403, blockedMessage)
 }
 
+interface StatusExpirationInput {
+  expiresAt: Date
+  displayText: string
+}
+
+function readStatusExpiration(context: AdminActionContext): StatusExpirationInput | null {
+  const rawValue = readAdminActionString(context.body, "statusExpiresAt")
+
+  if (!rawValue) {
+    return null
+  }
+
+  const rawOffset = context.body.statusExpiresAtTimezoneOffsetMinutes
+  const timezoneOffsetMinutes = readAdminActionNumber(context.body, "statusExpiresAtTimezoneOffsetMinutes")
+  const parsedBrowserTime = typeof rawOffset === "undefined" || rawOffset === null || rawOffset === ""
+    ? null
+    : parseBrowserLocalDateTime(rawValue, timezoneOffsetMinutes ?? Number.NaN)
+  if (rawOffset !== undefined && rawOffset !== null && rawOffset !== "" && !parsedBrowserTime) {
+    apiError(400, "自动解除时间不合法")
+  }
+
+  const expiresAt = parsedBrowserTime?.date ?? parseBusinessDateTime(rawValue)
+
+  if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
+    apiError(400, "自动解除时间不合法")
+  }
+
+  if (expiresAt.getTime() <= Date.now()) {
+    apiError(400, "自动解除时间必须晚于当前时间")
+  }
+
+  return {
+    expiresAt,
+    displayText: parsedBrowserTime?.displayText || formatBrowserLocalDateTimeInput(rawValue) || rawValue,
+  }
+}
+
+function buildStatusActionMessage(actionText: string, expiration: StatusExpirationInput | null) {
+  return expiration
+    ? `${actionText}，将在 ${expiration.displayText} 解禁`
+    : `${actionText}`
+}
+
 export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
-  "user.mute": defineAdminAction({ targetType: "USER", buildDetail: () => "管理员禁言用户" }, async (context) => {
+  "user.mute": defineAdminAction({ targetType: "USER", buildDetail: (context) => buildStatusActionMessage("管理员禁言用户", readStatusExpiration(context)) }, async (context) => {
     const userId = normalizePositiveUserId(context.targetId)
     if (!userId) apiError(400, "用户标识不合法")
     const user = requireUserStatusRecord(await findUserStatus(userId))
     ensureCanApplyRestrictiveStatus(user, UserStatus.MUTED)
+    const statusExpiration = readStatusExpiration(context)
     await ensureCanModerateUser(context.actor, {
       targetUserId: userId,
       postId: readAdminActionString(context.body, "postId") || undefined,
       commentId: readAdminActionString(context.body, "commentId") || undefined,
     })
-    await updateUserStatus(userId, UserStatus.MUTED)
+    await updateUserStatus(userId, UserStatus.MUTED, statusExpiration?.expiresAt ?? null)
 
     await writeAdminActionLog(context, adminUserActionHandlers["user.mute"].metadata)
     return { message: "用户已禁言" }
@@ -108,13 +153,14 @@ export const adminUserActionHandlers: Record<string, AdminActionDefinition> = {
     await writeAdminActionLog(context, adminUserActionHandlers["user.activate"].metadata)
     return { message: "用户状态已恢复" }
   }),
-  "user.ban": defineAdminAction({ targetType: "USER", buildDetail: () => "管理员拉黑用户" }, async (context) => {
+  "user.ban": defineAdminAction({ targetType: "USER", buildDetail: (context) => buildStatusActionMessage("管理员拉黑用户", readStatusExpiration(context)) }, async (context) => {
     if (!isSiteAdmin(context.actor)) apiError(403, "仅管理员可封禁用户")
     const userId = normalizePositiveUserId(context.targetId)
     if (!userId) apiError(400, "用户标识不合法")
     const user = requireUserStatusRecord(await findUserStatus(userId))
     ensureCanApplyRestrictiveStatus(user, UserStatus.BANNED)
-    await updateUserStatus(userId, UserStatus.BANNED)
+    const statusExpiration = readStatusExpiration(context)
+    await updateUserStatus(userId, UserStatus.BANNED, statusExpiration?.expiresAt ?? null)
 
     await writeAdminActionLog(context, adminUserActionHandlers["user.ban"].metadata)
     return { message: "用户已拉黑" }

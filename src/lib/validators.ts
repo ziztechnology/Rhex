@@ -411,12 +411,13 @@ export function validatePostPayload(body: unknown, options: PostPayloadValidatio
 }
 
 
-export function validateCommentPayload(body: unknown, options: CommentPayloadValidationOptions = {}): ValidationResult<{ postId: string; content: string; parentId: string; replyToUserName: string; replyToCommentId: string; useAnonymousIdentity: boolean; commentView: "tree" | "flat" }> {
+export function validateCommentPayload(body: unknown, options: CommentPayloadValidationOptions = {}): ValidationResult<{ postId: string; content: string; parentId: string; replyToUserName: string; replyToCommentId: string; privateRecipientUserId: number | null; useAnonymousIdentity: boolean; commentView: "tree" | "flat" }> {
   const postId = normalizeString(getField(body, "postId"))
   const content = normalizeString(getField(body, "content"))
   const parentId = normalizeString(getField(body, "parentId"))
   const replyToUserName = normalizeString(getField(body, "replyToUserName"))
   const replyToCommentId = normalizeString(getField(body, "replyToCommentId"))
+  const rawPrivateRecipientUserId = parsePositiveSafeInteger(getField(body, "privateRecipientUserId") ?? 0) ?? 0
   const useAnonymousIdentity = Boolean(getField(body, "useAnonymousIdentity"))
   const commentView = getField(body, "commentView") === "flat" ? "flat" : "tree"
 
@@ -439,6 +440,7 @@ export function validateCommentPayload(body: unknown, options: CommentPayloadVal
       parentId,
       replyToUserName,
       replyToCommentId,
+      privateRecipientUserId: rawPrivateRecipientUserId > 0 ? rawPrivateRecipientUserId : null,
       useAnonymousIdentity,
       commentView,
     },

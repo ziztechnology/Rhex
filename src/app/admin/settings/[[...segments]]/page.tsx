@@ -122,7 +122,7 @@ export default async function AdminSettingsPage(
 
   return (
     <AdminShell
-      currentKey="settings"
+      currentKey={resolved.section === "vip" && resolved.subTab === "tasks" ? "tasks" : "settings"}
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       headerDescription={resolved.subTabLabel ?? resolved.sectionLabel}
@@ -156,6 +156,7 @@ export default async function AdminSettingsPage(
           <AdminAppsSettingsForm
             initialLinks={siteSettings!.headerAppLinks}
             initialIconName={siteSettings!.headerAppIconName}
+            initialTopLinks={siteSettings!.topHeaderAppLinks}
           />
         ) : null}
 

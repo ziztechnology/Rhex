@@ -2,6 +2,7 @@ import { prisma } from "@/db/client"
 import { postListInclude } from "@/db/queries"
 import { buildHomeVisiblePostWhere } from "@/db/home-feed-visibility"
 import type { Prisma } from "@/db/types"
+import { PUBLIC_READABLE_POST_STATUSES } from "@/lib/post-types"
 
 export type FeedQuerySort = "latest" | "new" | "hot" | "weekly" | "following"
 
@@ -122,7 +123,7 @@ function buildFeedWhere(
 
   return {
     ...buildHomeVisiblePostWhere(),
-    status: "NORMAL",
+    status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
     id: excludedPostIds.length > 0 ? { notIn: excludedPostIds } : undefined,
     OR: followClauses.length > 0 ? followClauses : undefined,
   }
@@ -283,7 +284,7 @@ export function findLatestTopicPosts(limit: number) {
   return prisma.post.findMany({
     where: {
       ...buildHomeVisiblePostWhere(),
-      status: "NORMAL",
+      status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -300,7 +301,7 @@ export function findLatestReplyComments(limit: number) {
       status: "NORMAL",
       post: {
         ...buildHomeVisiblePostWhere(),
-        status: "NORMAL",
+        status: { in: [...PUBLIC_READABLE_POST_STATUSES] },
       },
     },
     orderBy: { createdAt: "desc" },

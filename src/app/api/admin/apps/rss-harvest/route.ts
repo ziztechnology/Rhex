@@ -21,6 +21,7 @@ import {
   testRssSourceConnection,
   updateRssSource,
 } from "@/lib/rss-harvest"
+import { approveRssSourceApplication, rejectRssSourceApplication } from "@/lib/rss-source-applications"
 
 export const dynamic = "force-dynamic"
 
@@ -145,6 +146,35 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
       includeWorkerPage: true,
     })
     return apiSuccess(undefined, result.message)
+  }
+
+  if (action === "approve-source-application") {
+    const applicationId = typeof body.applicationId === "string" ? body.applicationId.trim() : ""
+    const reviewNote = typeof body.reviewNote === "string" ? body.reviewNote.trim() : ""
+    const source = await approveRssSourceApplication({
+      applicationId,
+      reviewerId: adminUser.id,
+      reviewNote,
+    })
+    await writeAdminLog(adminUser.id, "rss.source-application.approve", "RSS_SOURCE", source.id, `批准 RSS 源申请 ${source.siteName}`, requestIp)
+    revalidateRssAdminPaths({
+      includeAppsIndex: true,
+      includeWorkerPage: true,
+    })
+    return apiSuccess(undefined, "申请已通过，RSS 源已创建并启用")
+  }
+
+  if (action === "reject-source-application") {
+    const applicationId = typeof body.applicationId === "string" ? body.applicationId.trim() : ""
+    const reviewNote = typeof body.reviewNote === "string" ? body.reviewNote.trim() : ""
+    await rejectRssSourceApplication({
+      applicationId,
+      reviewerId: adminUser.id,
+      reviewNote,
+    })
+    await writeAdminLog(adminUser.id, "rss.source-application.reject", "RSS_SOURCE", applicationId, "拒绝 RSS 源申请", requestIp)
+    revalidateRssAdminPaths()
+    return apiSuccess(undefined, "申请已拒绝")
   }
 
   if (action === "repair-scheduler") {

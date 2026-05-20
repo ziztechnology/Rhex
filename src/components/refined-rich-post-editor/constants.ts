@@ -64,7 +64,7 @@ export const TOOLBAR_TIPS = {
   },
   media: { label: "插入媒体", description: "插入音频、视频或 iframe 媒体标记。" },
   emoji: { label: "表情", description: "插入 Markdown 表情短码。" },
-  base64: { label: "Base64 编码", description: "打开模态框输入文本，插入时自动按 UTF-8 编码为 Base64。" },
+  base64: { label: "加密内容", description: "打开加密内容面板，可插入 Base64 编码或设置私密回复。" },
   imageUpload: {
     label: "添加图片",
     shortcuts: {

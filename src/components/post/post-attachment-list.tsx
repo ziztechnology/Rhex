@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { toast } from "@/components/ui/toast"
+import { copyTextToClipboard } from "@/lib/clipboard"
 
 function formatFileSize(fileSize: number | null | undefined) {
   if (!fileSize || fileSize <= 0) {
@@ -185,12 +186,11 @@ export function PostAttachmentList({ attachments, pointName }: { attachments: Po
   }
 
   async function handleCopy(text: string, successTitle: string) {
-    try {
-      await navigator.clipboard.writeText(text)
+    if (await copyTextToClipboard(text)) {
       toast.success(successTitle, "复制成功")
-    } catch {
-      toast.error("复制失败，请手动复制", "复制失败")
+      return
     }
+    toast.error("复制失败，请手动复制", "复制失败")
   }
 
   return (

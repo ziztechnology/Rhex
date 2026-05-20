@@ -22,12 +22,13 @@ export function updateSiteSettingsRecord(id: string, data: Prisma.SiteSettingUpd
   })
 }
 
-export function updateSiteSettingsHeaderApps(id: string, headerAppLinksJson: string, headerAppIconName: string) {
+export function updateSiteSettingsHeaderApps(id: string, headerAppLinksJson: string, headerAppIconName: string, appStateJson?: string) {
   return prisma.siteSetting.update({
     where: { id },
     data: {
       headerAppLinksJson,
       headerAppIconName,
+      ...(appStateJson === undefined ? {} : { appStateJson }),
     },
   })
 }

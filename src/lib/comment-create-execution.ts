@@ -1,10 +1,10 @@
 import type { CurrentUserRecord } from "@/db/current-user"
-import { NotificationType } from "@/db/types"
 
 import { executeAddonActionHook } from "@/addons-host/runtime/hooks"
 import { triggerAiMention } from "@/lib/ai/mention-trigger"
 import { apiError } from "@/lib/api-route"
 import { createCommentFlow } from "@/lib/comment-create-service"
+import { buildCommentCreationNotifications } from "@/lib/comment-notifications"
 import { revalidateContentListCaches } from "@/lib/content-list-cache"
 import { enqueuePostFollowCommentNotifications } from "@/lib/follow-notifications"
 import { handleCommentCreateSideEffects } from "@/lib/interaction-side-effects"
@@ -121,77 +121,42 @@ export async function executeCommentCreation(body: unknown, options: ExecuteComm
   }
 
   if (!result.reviewRequired) {
-    const notifications = [] as Array<{
-      userId: number
-      type: NotificationType
-      senderId: number
-      relatedType: "POST" | "COMMENT"
-      relatedId: string
-      title: string
-      content: string
-    }>
-
-    if (result.isRootComment && result.postAuthorId !== author.id) {
-      notifications.push({
-        userId: result.postAuthorId,
-        type: NotificationType.REPLY_POST,
-        senderId: author.id,
-        relatedType: "COMMENT",
-        relatedId: result.created.id,
-        title: "你的帖子有了新回复",
-        content: `${result.senderName} 回复了你的帖子：${result.created.content.slice(0, 80)}`,
-      })
-    }
-
-    if (result.normalizedReplyToUserId && result.normalizedReplyToUserId !== author.id) {
-      notifications.push({
-        userId: result.normalizedReplyToUserId,
-        type: NotificationType.REPLY_COMMENT,
-        senderId: author.id,
-        relatedType: "COMMENT",
-        relatedId: result.created.id,
-        title: "你的评论有了新回复",
-        content: `${result.senderName} 回复了你的评论：${result.created.content.slice(0, 80)}`,
-      })
-    }
-
-    const mentionTargets = [...new Set(result.mentionUserIds)].filter(
-      (userId) => userId !== author.id && userId !== result.normalizedReplyToUserId,
-    )
-    notifications.push(
-      ...mentionTargets.map((userId) => ({
-        userId,
-        type: NotificationType.MENTION,
-        senderId: author.id,
-        relatedType: "COMMENT" as const,
-        relatedId: result.created.id,
-        title: "你被提及了",
-        content: `${result.senderName} 在评论中提到了你：${result.created.content.slice(0, 80)}`,
-      })),
-    )
+    const notifications = buildCommentCreationNotifications({
+      authorId: author.id,
+      postAuthorId: result.postAuthorId,
+      commentId: result.created.id,
+      content: result.created.content,
+      senderName: result.senderName,
+      isRootComment: result.isRootComment,
+      normalizedReplyToUserId: result.normalizedReplyToUserId,
+      privateRecipientUserId: result.privateRecipientUserId,
+      mentionUserIds: result.mentionUserIds,
+    })
 
     if (notifications.length > 0) {
       void enqueueNotifications(notifications)
     }
 
-    void enqueuePostFollowCommentNotifications({
-      commentId: result.created.id,
-      excludeUserIds: [
-        ...(result.isRootComment ? [result.postAuthorId] : []),
-        ...(typeof result.normalizedReplyToUserId === "number"
-          ? [result.normalizedReplyToUserId]
-          : []),
-        ...result.mentionUserIds,
-      ],
-    })
+    if (!result.privateRecipientUserId) {
+      void enqueuePostFollowCommentNotifications({
+        commentId: result.created.id,
+        excludeUserIds: [
+          ...(result.isRootComment ? [result.postAuthorId] : []),
+          ...(typeof result.normalizedReplyToUserId === "number"
+            ? [result.normalizedReplyToUserId]
+            : []),
+          ...result.mentionUserIds,
+        ],
+      })
 
-    void triggerAiMention({
-      kind: "comment",
-      postId: result.postId,
-      commentId: result.created.id,
-      triggerUserId: author.id,
-      mentionedUserIds: result.mentionUserIds,
-    })
+      void triggerAiMention({
+        kind: "comment",
+        postId: result.postId,
+        commentId: result.created.id,
+        triggerUserId: author.id,
+        mentionedUserIds: result.mentionUserIds,
+      })
+    }
   }
 
   await executeAddonActionHook("comment.create.after", {

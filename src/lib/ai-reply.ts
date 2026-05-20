@@ -17,7 +17,7 @@ import { extractMentionTexts, stripUserLinkTokens } from "@/lib/mentions"
 import { logError, logInfo } from "@/lib/logger"
 import { createNotifications } from "@/lib/notification-writes"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getAiReplyConfig, getServerAiReplyConfig, isAiReplyConfigRunnable, type AiReplyConfigData } from "@/lib/ai-reply-config"
+import { getAiReplyConfig, getServerAiReplyConfig, isAiReplyConfigRunnable, type AiReplyAgentConfigData, type AiReplyConfigData } from "@/lib/ai-reply-config"
 import { resolveAiProvider, type AiProviderConfig } from "@/lib/ai/provider"
 import { runAiTask } from "@/lib/ai/service"
 import { AiProviderError } from "@/lib/ai/provider/types"
@@ -38,6 +38,7 @@ const AI_REPLY_DELETABLE_TASK_STATUSES = [
   AiReplyTaskStatus.FAILED,
   AiReplyTaskStatus.CANCELLED,
 ] as const
+type AiReplyTriggerReason = "mention" | "keyword" | "all-posts" | "board"
 
 type AiReplyTaskWorkerRecord = Awaited<ReturnType<typeof loadAiReplyTaskForWorker>>
 const autoCategorizeRecentTaskSelect = {
@@ -89,6 +90,12 @@ export interface AiReplyAdminData {
     nickname: string | null
     status: string
   } | null
+  agentUsers: Array<{
+    id: number
+    username: string
+    nickname: string | null
+    status: string
+  }>
   summary: {
     pending: number
     processing: number
@@ -290,6 +297,32 @@ function buildCommentSourceKey(commentId: string, agentUserId: number) {
   return `comment:${commentId}:agent:${agentUserId}`
 }
 
+function buildAiReplySourceKey(params: { sourceType: AiReplyTaskSourceType; postId: string; sourceCommentId?: string; agentUserId: number; reason: AiReplyTriggerReason }) {
+  const baseKey = params.sourceType === AiReplyTaskSourceType.POST
+    ? buildPostSourceKey(params.postId, params.agentUserId)
+    : buildCommentSourceKey(params.sourceCommentId ?? "", params.agentUserId)
+  return params.reason === "mention" ? baseKey : `${baseKey}:trigger:${params.reason}`
+}
+
+function readAiReplyTriggerReason(sourceKey: string): AiReplyTriggerReason {
+  if (sourceKey.endsWith(":trigger:keyword")) return "keyword"
+  if (sourceKey.endsWith(":trigger:all-posts")) return "all-posts"
+  if (sourceKey.endsWith(":trigger:board")) return "board"
+  return "mention"
+}
+
+function textMatchesKeywordTriggers(text: string, keywords: string[]) {
+  const normalizedText = text.toLowerCase()
+  return keywords.some((keyword) => {
+    const normalizedKeyword = keyword.trim().toLowerCase()
+    return normalizedKeyword.length > 0 && normalizedText.includes(normalizedKeyword)
+  })
+}
+
+function findRunnableAgentConfig(config: Awaited<ReturnType<typeof getServerAiReplyConfig>>, agentUserId: number): AiReplyAgentConfigData | null {
+  return config.agents.find((agent) => agent.enabled && agent.agentUserId === agentUserId) ?? null
+}
+
 function getAiReplyRetryDelayMs(attemptCount: number) {
   const delayMs = AI_REPLY_RETRY_BASE_DELAY_MS * 2 ** Math.max(0, attemptCount - 1)
   return Math.min(AI_REPLY_RETRY_MAX_DELAY_MS, delayMs)
@@ -378,6 +411,7 @@ function buildCommentReplyUserPrompt(task: NonNullable<AiReplyTaskWorkerRecord>)
 
 async function callAiReplyModel(params: {
   config: Awaited<ReturnType<typeof getServerAiReplyConfig>>
+  agentConfig: AiReplyAgentConfigData
   sourceType: AiReplyTaskSourceType
   prompt: string
   agentUser: {
@@ -386,11 +420,11 @@ async function callAiReplyModel(params: {
   }
 }) {
   const systemPrompt = [
-    params.config.systemPrompt.trim(),
+    params.agentConfig.systemPrompt.trim(),
     `你当前扮演的论坛账号是 @${params.agentUser.username}${params.agentUser.nickname ? `（${params.agentUser.nickname}）` : ""}。`,
     params.sourceType === AiReplyTaskSourceType.POST
-      ? params.config.postReplyPrompt.trim()
-      : params.config.commentReplyPrompt.trim(),
+      ? params.agentConfig.postReplyPrompt.trim()
+      : params.agentConfig.commentReplyPrompt.trim(),
   ].filter(Boolean).join("\n\n")
 
   const providerConfig: AiProviderConfig = {
@@ -450,6 +484,20 @@ export async function sendAiReplyConnectivityTest(params: {
 
   const reply = await callAiReplyModel({
     config: params.config,
+    agentConfig: params.config.agents.find((agent) => agent.agentUserId === params.agentUser.id) ?? {
+      id: "test",
+      enabled: true,
+      label: "AI 助手",
+      agentUserId: params.agentUser.id,
+      respondToPostMentions: true,
+      respondToCommentMentions: true,
+      autoReplyToAllPosts: false,
+      keywordTriggers: [],
+      boardSlugs: [],
+      systemPrompt: params.config.systemPrompt,
+      postReplyPrompt: params.config.postReplyPrompt,
+      commentReplyPrompt: params.config.commentReplyPrompt,
+    },
     sourceType: AiReplyTaskSourceType.COMMENT,
     agentUser: params.agentUser,
     prompt: [
@@ -524,6 +572,7 @@ async function loadAiReplyTaskForWorker(taskId: string) {
     where: { id: taskId },
     select: {
       id: true,
+      sourceKey: true,
       sourceType: true,
       status: true,
       postId: true,
@@ -707,8 +756,9 @@ function assertTaskStillRunnable(task: NonNullable<AiReplyTaskWorkerRecord>, con
     throw new AiReplyTaskCancelledError("AI 配置当前不可用，任务已取消")
   }
 
-  if (config.agentUserId !== task.agentUserId) {
-    throw new AiReplyTaskCancelledError("AI 代理账号配置已变更，任务已取消")
+  const agentConfig = findRunnableAgentConfig(config, task.agentUserId)
+  if (!agentConfig) {
+    throw new AiReplyTaskCancelledError("AI 代理账号配置已变更或已停用，任务已取消")
   }
 
   if (task.agentUser.status !== "ACTIVE") {
@@ -724,11 +774,12 @@ function assertTaskStillRunnable(task: NonNullable<AiReplyTaskWorkerRecord>, con
       throw new AiReplyTaskCancelledError("AI 自己发布的帖子不会再次触发 AI 回复")
     }
 
-    if (!config.respondToPostMentions) {
+    const triggerReason = readAiReplyTriggerReason(task.sourceKey)
+    if (triggerReason === "mention" && !agentConfig.respondToPostMentions) {
       throw new AiReplyTaskCancelledError("当前未启用帖子提及回复")
     }
 
-    if (!doesPostStillMentionAgent(task.post, task.agentUser)) {
+    if (triggerReason === "mention" && !doesPostStillMentionAgent(task.post, task.agentUser)) {
       throw new AiReplyTaskCancelledError("帖子中已不存在对 AI 账号的提及，任务已取消")
     }
 
@@ -743,7 +794,8 @@ function assertTaskStillRunnable(task: NonNullable<AiReplyTaskWorkerRecord>, con
     throw new AiReplyTaskCancelledError("AI 自己的评论不会再次触发 AI 回复")
   }
 
-  if (!config.respondToCommentMentions) {
+  const triggerReason = readAiReplyTriggerReason(task.sourceKey)
+  if (triggerReason === "mention" && !agentConfig.respondToCommentMentions) {
     throw new AiReplyTaskCancelledError("当前未启用评论提及回复")
   }
 
@@ -751,7 +803,7 @@ function assertTaskStillRunnable(task: NonNullable<AiReplyTaskWorkerRecord>, con
     throw new AiReplyTaskCancelledError("源评论与帖子不匹配，任务已取消")
   }
 
-  if (!doesCommentStillMentionAgent(task.sourceComment.content, task.agentUser)) {
+  if (triggerReason === "mention" && !doesCommentStillMentionAgent(task.sourceComment.content, task.agentUser)) {
     throw new AiReplyTaskCancelledError("评论中已不存在对 AI 账号的提及，任务已取消")
   }
 }
@@ -759,6 +811,10 @@ function assertTaskStillRunnable(task: NonNullable<AiReplyTaskWorkerRecord>, con
 async function buildAiReplyContent(task: NonNullable<AiReplyTaskWorkerRecord>) {
   const config = await getServerAiReplyConfig()
   assertTaskStillRunnable(task, config)
+  const agentConfig = findRunnableAgentConfig(config, task.agentUserId)
+  if (!agentConfig) {
+    throw new AiReplyTaskCancelledError("AI 代理账号配置已变更或已停用，任务已取消")
+  }
 
   const prompt = task.sourceType === AiReplyTaskSourceType.POST
     ? buildPostReplyUserPrompt(task)
@@ -766,6 +822,7 @@ async function buildAiReplyContent(task: NonNullable<AiReplyTaskWorkerRecord>) {
 
   const rawReply = await callAiReplyModel({
     config,
+    agentConfig,
     sourceType: task.sourceType,
     prompt,
     agentUser: task.agentUser,
@@ -959,6 +1016,7 @@ async function upsertAiReplyTask(params: {
   sourceCommentId?: string
   triggerUserId: number
   agentUserId: number
+  reason: AiReplyTriggerReason
 }) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.aiReplyTask.findUnique({
@@ -1028,6 +1086,114 @@ async function upsertAiReplyTask(params: {
   })
 }
 
+async function loadAiReplyTriggerSource(params: {
+  sourceType: AiReplyTaskSourceType
+  postId: string
+  sourceCommentId?: string
+}) {
+  if (params.sourceType === AiReplyTaskSourceType.POST) {
+    const post = await prisma.post.findUnique({
+      where: { id: params.postId },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        appendedContent: true,
+        status: true,
+        authorId: true,
+        board: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    })
+
+    if (!post || post.status !== "NORMAL") {
+      return null
+    }
+
+    return {
+      authorId: post.authorId,
+      boardSlug: post.board.slug,
+      text: [
+        post.title,
+        getPostMentionTextForAi({
+          content: post.content,
+          appendedContent: post.appendedContent,
+        }),
+      ].filter(Boolean).join("\n\n"),
+    }
+  }
+
+  const comment = params.sourceCommentId
+    ? await prisma.comment.findUnique({
+        where: { id: params.sourceCommentId },
+        select: {
+          id: true,
+          content: true,
+          status: true,
+          userId: true,
+          post: {
+            select: {
+              id: true,
+              status: true,
+              authorId: true,
+              board: {
+                select: {
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
+      })
+    : null
+
+  if (!comment || comment.status !== "NORMAL" || comment.post.status !== "NORMAL" || comment.post.id !== params.postId) {
+    return null
+  }
+
+  return {
+    authorId: comment.userId,
+    boardSlug: comment.post.board.slug,
+    text: stripUserLinkTokens(comment.content),
+  }
+}
+
+function resolveAiReplyTriggerReasonForAgent(params: {
+  sourceType: AiReplyTaskSourceType
+  mentionedUserIds: number[]
+  source: { boardSlug: string; text: string }
+  agent: AiReplyAgentConfigData
+}): AiReplyTriggerReason | null {
+  if (params.agent.agentUserId && params.mentionedUserIds.includes(params.agent.agentUserId)) {
+    if (params.sourceType === AiReplyTaskSourceType.POST && params.agent.respondToPostMentions) {
+      return "mention"
+    }
+
+    if (params.sourceType === AiReplyTaskSourceType.COMMENT && params.agent.respondToCommentMentions) {
+      return "mention"
+    }
+  }
+
+  if (params.sourceType === AiReplyTaskSourceType.POST) {
+    if (params.agent.autoReplyToAllPosts) {
+      return "all-posts"
+    }
+
+    if (params.agent.boardSlugs.includes(params.source.boardSlug.toLowerCase())) {
+      return "board"
+    }
+  }
+
+  if (textMatchesKeywordTriggers(params.source.text, params.agent.keywordTriggers)) {
+    return "keyword"
+  }
+
+  return null
+}
+
 async function maybeEnqueueAiReplyTask(params: {
   sourceType: AiReplyTaskSourceType
   postId: string
@@ -1037,58 +1203,78 @@ async function maybeEnqueueAiReplyTask(params: {
 }) {
   const config = await getServerAiReplyConfig()
 
-  if (!isAiReplyConfigRunnable(config) || !config.agentUserId) {
+  if (!isAiReplyConfigRunnable(config)) {
     return
   }
 
-  if (params.triggerUserId === config.agentUserId) {
+  const source = await loadAiReplyTriggerSource(params)
+  if (!source) {
     return
   }
 
-  if (!params.mentionedUserIds.includes(config.agentUserId)) {
-    return
-  }
+  const enqueuedTasks: Array<{ id: string; agentUserId: number; reason: AiReplyTriggerReason }> = []
 
-  if (params.sourceType === AiReplyTaskSourceType.POST && !config.respondToPostMentions) {
-    return
-  }
+  for (const agent of config.agents) {
+    if (!agent.enabled || !agent.agentUserId) {
+      continue
+    }
 
-  if (params.sourceType === AiReplyTaskSourceType.COMMENT && !config.respondToCommentMentions) {
-    return
-  }
+    if (params.triggerUserId === agent.agentUserId || source.authorId === agent.agentUserId) {
+      continue
+    }
 
-  const sourceKey = params.sourceType === AiReplyTaskSourceType.POST
-    ? buildPostSourceKey(params.postId, config.agentUserId)
-    : buildCommentSourceKey(params.sourceCommentId ?? "", config.agentUserId)
+    const reason = resolveAiReplyTriggerReasonForAgent({
+      sourceType: params.sourceType,
+      mentionedUserIds: params.mentionedUserIds,
+      source,
+      agent,
+    })
+    if (!reason) {
+      continue
+    }
 
-  const task = await upsertAiReplyTask({
-    sourceType: params.sourceType,
-    sourceKey,
-    postId: params.postId,
-    sourceCommentId: params.sourceCommentId,
-    triggerUserId: params.triggerUserId,
-    agentUserId: config.agentUserId,
-  })
-
-  if (!task.shouldEnqueue) {
-    return
-  }
-
-  await enqueueBackgroundJob(AI_REPLY_BACKGROUND_JOB_NAME, {
-    taskId: task.id,
-  })
-
-  logInfo({
-    scope: "ai-reply",
-    action: "task-enqueued",
-    userId: config.agentUserId,
-    targetId: task.id,
-    metadata: {
+    const sourceKey = buildAiReplySourceKey({
       sourceType: params.sourceType,
       postId: params.postId,
-      sourceCommentId: params.sourceCommentId ?? null,
-    },
-  })
+      sourceCommentId: params.sourceCommentId,
+      agentUserId: agent.agentUserId,
+      reason,
+    })
+
+    const task = await upsertAiReplyTask({
+      sourceType: params.sourceType,
+      sourceKey,
+      postId: params.postId,
+      sourceCommentId: params.sourceCommentId,
+      triggerUserId: params.triggerUserId,
+      agentUserId: agent.agentUserId,
+      reason,
+    })
+
+    if (!task.shouldEnqueue) {
+      continue
+    }
+
+    await enqueueBackgroundJob(AI_REPLY_BACKGROUND_JOB_NAME, {
+      taskId: task.id,
+    })
+    enqueuedTasks.push({ id: task.id, agentUserId: agent.agentUserId, reason })
+
+    logInfo({
+      scope: "ai-reply",
+      action: "task-enqueued",
+      userId: agent.agentUserId,
+      targetId: task.id,
+      metadata: {
+        sourceType: params.sourceType,
+        postId: params.postId,
+        sourceCommentId: params.sourceCommentId ?? null,
+        triggerReason: reason,
+      },
+    })
+  }
+
+  return enqueuedTasks
 }
 
 registerBackgroundJobHandler(AI_REPLY_BACKGROUND_JOB_NAME, async (payload) => {
@@ -1136,10 +1322,11 @@ export async function getAiReplyAdminDataPage(options?: {
     getAutoCategorizeConfig(),
   ])
 
-  const [agentUser, autoCategorizeDefaultBoard, pending, processing, succeeded, failed, cancelled, totalRecentTasks, autoPending, autoProcessing, autoSucceeded, autoFailed, autoCancelled, autoTotalRecentTasks] = await Promise.all([
-    config.agentUserId
-      ? prisma.user.findUnique({
-          where: { id: config.agentUserId },
+  const agentUserIds = Array.from(new Set(config.agents.map((agent) => agent.agentUserId).filter((id): id is number => Boolean(id))))
+  const [agentUsers, autoCategorizeDefaultBoard, pending, processing, succeeded, failed, cancelled, totalRecentTasks, autoPending, autoProcessing, autoSucceeded, autoFailed, autoCancelled, autoTotalRecentTasks] = await Promise.all([
+    agentUserIds.length > 0
+      ? prisma.user.findMany({
+          where: { id: { in: agentUserIds } },
           select: {
             id: true,
             username: true,
@@ -1147,7 +1334,7 @@ export async function getAiReplyAdminDataPage(options?: {
             status: true,
           },
         })
-      : Promise.resolve(null),
+      : Promise.resolve([]),
     autoCategorizeConfig.defaultBoardSlug
       ? prisma.board.findUnique({
           where: { slug: autoCategorizeConfig.defaultBoardSlug },
@@ -1170,6 +1357,11 @@ export async function getAiReplyAdminDataPage(options?: {
     prisma.autoCategorizeTask.count({ where: { status: AiReplyTaskStatus.CANCELLED } }),
     prisma.autoCategorizeTask.count(),
   ])
+  const agentUserMap = new Map(agentUsers.map((user) => [user.id, user]))
+  const agentUser = config.agentUserId ? agentUserMap.get(config.agentUserId) ?? null : null
+  const orderedAgentUsers = agentUserIds
+    .map((id) => agentUserMap.get(id))
+    .filter((user): user is NonNullable<typeof user> => Boolean(user))
   const pageSize = AI_REPLY_ADMIN_TASKS_PAGE_SIZE
   const totalPages = Math.max(1, Math.ceil(totalRecentTasks / pageSize))
   const page = Math.min(normalizeAiReplyAdminTasksPage(options?.page), totalPages)
@@ -1253,6 +1445,7 @@ export async function getAiReplyAdminDataPage(options?: {
     autoCategorizeConfig,
     autoCategorizeDefaultBoard,
     agentUser,
+    agentUsers: orderedAgentUsers,
     summary: {
       pending,
       processing,

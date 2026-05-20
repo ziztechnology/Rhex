@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/rbutton"
 import { TextField } from "@/components/ui/text-field"
+import { copyTextToClipboard } from "@/lib/clipboard"
 import { formatDateTime, serializeDate } from "@/lib/formatters"
 
 interface AdminRedeemCodeManagerProps {
@@ -51,12 +52,11 @@ export function AdminRedeemCodeManager({ initialRedeemCodes }: AdminRedeemCodeMa
       setFeedback("当前没有可复制的未兑换兑换码")
       return
     }
-    try {
-      await navigator.clipboard.writeText(exportText)
+    if (await copyTextToClipboard(exportText)) {
       setFeedback(`已复制 ${pendingRedeemCodes.length} 个未兑换兑换码`)
-    } catch {
-      setFeedback("复制失败，请检查浏览器剪贴板权限")
+      return
     }
+    setFeedback("复制失败，请检查浏览器剪贴板权限")
   }
 
   function handleExportPendingCodes() {

@@ -7,7 +7,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function UniverseFeedPage(props: {
-  searchParams?: Promise<{ page?: string | string[] }>
+  searchParams?: Promise<{ page?: string | string[]; source?: string | string[] }>
 }) {
   return <HomeFeedPage sort="universe" searchParams={props.searchParams} enableUniverseSourceFilter />
 }

@@ -30,6 +30,7 @@ import type {
   AdminMessageParticipantItem,
   AdminMessageRecordItem,
 } from "@/lib/admin-message-management"
+import { getAvatarFallback } from "@/lib/avatar"
 import { formatNumber } from "@/lib/formatters"
 import { cn } from "@/lib/utils"
 
@@ -496,7 +497,7 @@ function PaginationLink({
 }
 
 function getInitials(name: string) {
-  return name.trim().slice(0, 2).toUpperCase() || "NA"
+  return getAvatarFallback(name)
 }
 
 function getRoleLabel(role: string) {
