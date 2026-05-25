@@ -30,6 +30,7 @@ import type { SiteSettingsRecordData } from "@/lib/site-settings.record"
 import { resolveTaskDrivenCheckInRewardRanges } from "@/lib/task-check-in-display"
 import { type SiteTippingGiftItem } from "@/lib/tipping-gifts"
 import { normalizeUploadProvider } from "@/lib/upload-provider"
+import { DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD } from "@/lib/god-comment-settings"
 import type { ServerSiteSettingsData, SiteSettingsData } from "@/lib/site-settings.types"
 import { normalizeHeaderAppIconName, parseSiteHeaderAppLinks, resolveTopHeaderAppLinks } from "./site-header-app-links"
 import { DEFAULT_MESSAGE_PROMPT_AUDIO_PATH } from "@/lib/message-prompt-audio"
@@ -62,6 +63,7 @@ function getDefaultServerSiteSettings(): ServerSiteSettingsData {
     postOfflineVip1Price: 0,
     postOfflineVip2Price: 0,
     postOfflineVip3Price: 0,
+    godCommentAutoLikeThreshold: DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD,
   })
 }
 
@@ -119,6 +121,9 @@ function normalizeLegacyServerSiteSettings(data: ServerSiteSettingsData): Server
       ? Math.max(0, Math.floor(data.checkInMakeUpOldestDayLimit))
       : defaults.checkInMakeUpOldestDayLimit,
     commentLoadMode: normalizeCommentLoadMode(data.commentLoadMode, defaults.commentLoadMode),
+    godCommentAutoLikeThreshold: typeof data.godCommentAutoLikeThreshold === "number" && Number.isFinite(data.godCommentAutoLikeThreshold)
+      ? Math.max(1, Math.floor(data.godCommentAutoLikeThreshold))
+      : defaults.godCommentAutoLikeThreshold,
   }
 }
 
@@ -498,6 +503,7 @@ function mapSiteSettings(record: SiteSettingsRecordData, tippingGifts: SiteTippi
     siteChatEnabled: siteChatSettings.enabled,
     postEditableMinutes: normalizePositiveInteger(record.postEditableMinutes, 10),
     commentEditableMinutes: normalizePositiveInteger(record.commentEditableMinutes, 5),
+    godCommentAutoLikeThreshold: normalizePositiveInteger(record.godCommentAutoLikeThreshold, DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD),
     guestCanViewComments: commentAccessSettings.guestCanView,
     commentInitialVisibleReplies: commentAccessSettings.initialVisibleReplies,
     anonymousPostEnabled: anonymousPostSettings.enabled,

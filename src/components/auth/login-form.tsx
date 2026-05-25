@@ -206,12 +206,13 @@ export function LoginForm({
     }
 
     const successMessage = "登录成功，正在跳转到首页…"
-    //setMessage(successMessage)
+    setMessage(successMessage)
     toast.success(successMessage, "登录成功")
-    await refreshCurrentUser()
     router.replace("/")
-    router.refresh()
-    setLoading(false)
+    void refreshCurrentUser().finally(() => {
+      router.refresh()
+      setLoading(false)
+    })
   }
 
   return (

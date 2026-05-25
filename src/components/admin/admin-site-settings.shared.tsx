@@ -10,6 +10,7 @@ import { COMMENT_LOAD_MODE_INFINITE, COMMENT_LOAD_MODE_PAGINATION, type CommentL
 import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION, type PostListLoadMode } from "@/lib/post-list-load-mode"
 import { normalizePostListDisplayMode, POST_LIST_DISPLAY_MODE_DEFAULT, type PostListDisplayMode } from "@/lib/post-list-display"
 import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
+import { DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD } from "@/lib/god-comment-settings"
 import { DEFAULT_THEME_CUSTOMIZATION_SETTINGS, type BuiltInThemePreset, type EditableThemePresetDefinition, type FontSizePreset, type FontSizePresetDefinition, type ThemeCustomizationSettings, type ThemeRuntimeSettings } from "@/lib/theme"
 import type { InteractionGateCondition, InteractionGateSettings } from "@/lib/site-settings"
 import type { LeftSidebarDisplayMode, PostSlugGenerationMode, RegistrationEmailTemplateSettings, SiteSearchSettings, SiteTippingGiftItem } from "@/lib/site-settings"
@@ -67,6 +68,7 @@ export interface AdminBasicSettingsInitialSettings {
   turnstileSecretKey?: string | null
   postEditableMinutes: number
   commentEditableMinutes: number
+  godCommentAutoLikeThreshold: number
   guestCanViewComments: boolean
   commentInitialVisibleReplies: number
   siteChatEnabled: boolean
@@ -194,6 +196,7 @@ export interface AdminBasicSettingsDraft {
   analyticsCode: string
   postEditableMinutes: string
   commentEditableMinutes: string
+  godCommentAutoLikeThreshold: string
   guestCanViewComments: boolean
   commentInitialVisibleReplies: string
   siteChatEnabled: boolean
@@ -426,6 +429,7 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     analyticsCode: initialSettings.analyticsCode ?? "",
     postEditableMinutes: coerceNumberString(initialSettings.postEditableMinutes, 10),
     commentEditableMinutes: coerceNumberString(initialSettings.commentEditableMinutes, 5),
+    godCommentAutoLikeThreshold: coerceNumberString(initialSettings.godCommentAutoLikeThreshold, DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD),
     guestCanViewComments: coerceBoolean(initialSettings.guestCanViewComments, true),
     commentInitialVisibleReplies: coerceNumberString(initialSettings.commentInitialVisibleReplies, 10),
     siteChatEnabled: coerceBoolean(initialSettings.siteChatEnabled, false),
@@ -693,6 +697,7 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
     siteChatEnabled: draft.siteChatEnabled,
     postEditableMinutes: Number(draft.postEditableMinutes),
     commentEditableMinutes: Number(draft.commentEditableMinutes),
+    godCommentAutoLikeThreshold: Number(draft.godCommentAutoLikeThreshold),
     anonymousPostEnabled: draft.anonymousPostEnabled,
     anonymousPostPrice: Number(draft.anonymousPostPrice),
     anonymousPostDailyLimit: Number(draft.anonymousPostDailyLimit),
