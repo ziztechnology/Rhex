@@ -155,10 +155,10 @@ export async function updatePostFlow(input: {
       replyUnlockContentWithCards,
       purchaseUnlockContentWithCards,
     ] = await Promise.all([
-      processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: input.request.url, currentPostId: input.postId }),
-      loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: input.request.url, currentPostId: input.postId }) : "",
-      replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: input.request.url, currentPostId: input.postId }) : "",
-      purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: input.request.url, currentPostId: input.postId }) : "",
+      processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }),
+      loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
+      replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
+      purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
     ])
 
     const normalizedReplyThreshold = replyUnlockContent ? (replyThreshold ?? 1) : undefined
@@ -303,6 +303,7 @@ export async function updatePostFlow(input: {
   const appendSafety = await enforceSensitiveText({ scene: "post.content", text: hookedAppendedContent })
   const appendedContentWithCards = await processInternalPostCardEmbeds(appendSafety.sanitizedText, {
     requestUrl: input.request.url,
+    requestHeaders: input.request.headers,
     currentPostId: input.postId,
   })
   const nextSortOrder = (post.appendices[0]?.sortOrder ?? -1) + 1

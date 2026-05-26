@@ -163,6 +163,12 @@ export interface LeftSidebarDisplaySettings {
   mode: LeftSidebarDisplayMode
 }
 
+export interface LeftSidebarHomeSettings {
+  enabled: boolean
+  name: string
+  icon: string
+}
+
 export interface FooterCopyrightSettings {
   text: string
   brandingVisible: boolean

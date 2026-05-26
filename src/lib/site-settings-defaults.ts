@@ -202,6 +202,11 @@ export const defaultSiteSettingsCreateInput = {
       leftSidebarDisplay: {
         mode: "DEFAULT",
       },
+      leftSidebarHome: {
+        enabled: true,
+        name: "首页",
+        icon: "🏠",
+      },
       attachments: {
         uploadEnabled: false,
         downloadEnabled: false,

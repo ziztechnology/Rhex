@@ -175,10 +175,10 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
     replyUnlockContentWithCards,
     purchaseUnlockContentWithCards,
   ] = await Promise.all([
-    processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: options.request.url }),
-    loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: options.request.url }) : "",
-    replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: options.request.url }) : "",
-    purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: options.request.url }) : "",
+    processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }),
+    loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
+    replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
+    purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
   ])
 
   const contentDocument = buildPostContentDocument({

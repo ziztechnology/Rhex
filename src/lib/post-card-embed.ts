@@ -1,11 +1,23 @@
 import { escapeHtml } from "@/lib/markdown/shared"
 
 export const POST_CARD_EMBED_PREFIX = "::post-card"
+const POST_CARD_EMBED_INLINE_PREFIX = "::post-card-inline"
 const POST_CARD_EMBED_VERSION = 1
 const MAX_POST_CARD_EMBED_PAYLOAD_LENGTH = 12000
 
 export interface InternalPostUrlMatch {
   routeSegment: string
+}
+
+export interface InternalPostUrlInlineMatch extends InternalPostUrlMatch {
+  url: string
+  startIndex: number
+  endIndex: number
+}
+
+export interface InternalPostUrlExtractionOptions {
+  requestUrl?: string
+  allowedOrigins?: readonly string[]
 }
 
 export interface EmbeddedPostCardSnapshot {
@@ -142,27 +154,47 @@ export function buildPostCardEmbedToken(snapshot: EmbeddedPostCardSnapshot) {
   return `${POST_CARD_EMBED_PREFIX} ${encodeUtf8Base64Url(JSON.stringify(normalized))}`
 }
 
-export function parsePostCardEmbedToken(line: string) {
+export function buildInlinePostCardEmbedToken(snapshot: EmbeddedPostCardSnapshot) {
+  const normalized = normalizePostCardSnapshot(snapshot)
+  if (!normalized) {
+    throw new Error("Invalid post card snapshot")
+  }
+
+  return `${POST_CARD_EMBED_INLINE_PREFIX} ${encodeUtf8Base64Url(JSON.stringify(normalized))}`
+}
+
+function parsePostCardEmbedTokenWithMode(line: string) {
   const trimmed = line.trim()
-  if (!trimmed.startsWith(`${POST_CARD_EMBED_PREFIX} `)) {
+  const inline = trimmed.startsWith(`${POST_CARD_EMBED_INLINE_PREFIX} `)
+  const prefix = inline ? POST_CARD_EMBED_INLINE_PREFIX : POST_CARD_EMBED_PREFIX
+  if (!trimmed.startsWith(`${prefix} `)) {
     return null
   }
 
-  const payload = trimmed.slice(POST_CARD_EMBED_PREFIX.length).trim()
+  const payload = trimmed.slice(prefix.length).trim()
   const json = decodeUtf8Base64Url(payload)
   if (!json) {
     return null
   }
 
   try {
-    return normalizePostCardSnapshot(JSON.parse(json))
+    const snapshot = normalizePostCardSnapshot(JSON.parse(json))
+    return snapshot ? { snapshot, inline } : null
   } catch {
     return null
   }
 }
 
+export function parsePostCardEmbedToken(line: string) {
+  return parsePostCardEmbedTokenWithMode(line)?.snapshot ?? null
+}
+
+function isInlinePostCardEmbedTokenLine(line: string) {
+  return parsePostCardEmbedTokenWithMode(line)?.inline ?? false
+}
+
 export function isPostCardEmbedTokenLine(line: string) {
-  return parsePostCardEmbedToken(line) !== null
+  return parsePostCardEmbedTokenWithMode(line) !== null
 }
 
 function stripTrailingSlash(pathname: string) {
@@ -192,21 +224,51 @@ function isSameOrigin(url: URL, baseUrl: URL) {
   )
 }
 
-export function extractInternalPostUrlFromLine(line: string, requestUrl?: string): InternalPostUrlMatch | null {
-  const trimmed = line.trim()
-  if (!trimmed || /\s/.test(trimmed) || isPostCardEmbedTokenLine(trimmed)) {
+function parseUrl(value: string | undefined, fallback: string) {
+  try {
+    return new URL(value || fallback)
+  } catch {
+    return new URL(fallback)
+  }
+}
+
+function parseAllowedOrigin(value: string) {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null
+  } catch {
     return null
   }
+}
 
-  const baseUrl = new URL(requestUrl || "http://localhost")
+function resolveExtractionOptions(options?: string | InternalPostUrlExtractionOptions) {
+  if (typeof options === "string") {
+    return { requestUrl: options, allowedOrigins: [] as readonly string[] }
+  }
+
+  return {
+    requestUrl: options?.requestUrl,
+    allowedOrigins: options?.allowedOrigins ?? [],
+  }
+}
+
+function extractInternalPostUrlFromValue(value: string, options?: string | InternalPostUrlExtractionOptions): InternalPostUrlMatch | null {
+  const extractionOptions = resolveExtractionOptions(options)
+  const baseUrl = parseUrl(extractionOptions.requestUrl, "http://localhost")
+  const allowedOrigins = [
+    baseUrl,
+    ...extractionOptions.allowedOrigins
+      .map((origin) => parseAllowedOrigin(origin))
+      .filter((origin): origin is URL => origin !== null),
+  ]
   let url: URL
 
   try {
-    if (trimmed.startsWith("/")) {
-      url = new URL(trimmed, baseUrl)
-    } else if (/^https?:\/\//i.test(trimmed)) {
-      url = new URL(trimmed)
-      if (!isSameOrigin(url, baseUrl)) {
+    if (value.startsWith("/")) {
+      url = new URL(value, baseUrl)
+    } else if (/^https?:\/\//i.test(value)) {
+      url = new URL(value)
+      if (!allowedOrigins.some((origin) => isSameOrigin(url, origin))) {
         return null
       }
     } else {
@@ -226,23 +288,139 @@ export function extractInternalPostUrlFromLine(line: string, requestUrl?: string
   return routeSegment ? { routeSegment } : null
 }
 
+function previousNonWhitespaceIndex(value: string, index: number) {
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    if (!/\s/.test(value[cursor] ?? "")) {
+      return cursor
+    }
+  }
+
+  return -1
+}
+
+function isEscaped(value: string, index: number) {
+  let slashCount = 0
+  for (let cursor = index - 1; cursor >= 0 && value[cursor] === "\\"; cursor -= 1) {
+    slashCount += 1
+  }
+
+  return slashCount % 2 === 1
+}
+
+function isInsideInlineCode(value: string, index: number) {
+  let inCode = false
+  for (let cursor = 0; cursor < index; cursor += 1) {
+    if (value[cursor] === "`" && !isEscaped(value, cursor)) {
+      inCode = !inCode
+    }
+  }
+
+  return inCode
+}
+
+function isMarkdownLinkDestination(value: string, startIndex: number) {
+  const openParenIndex = previousNonWhitespaceIndex(value, startIndex)
+  if (value[openParenIndex] !== "(") {
+    return false
+  }
+
+  const closeBracketIndex = previousNonWhitespaceIndex(value, openParenIndex)
+  return value[closeBracketIndex] === "]"
+}
+
+function isMarkdownReferenceDestination(value: string, startIndex: number) {
+  return /^\s{0,3}\[[^\]\n]+\]:\s*(?:<\s*)?$/u.test(value.slice(0, startIndex))
+}
+
+function trimUrlCandidate(value: string) {
+  return value.replace(/[),.;:!?，。；：！？、\]}]+$/u, "")
+}
+
+const INLINE_INTERNAL_POST_URL_PATTERN = /(^|[\s([{])((?:https?:\/\/[^\s<>"']+)|(?:\/posts\/[^\s<>"']+))/giu
+
+export function extractInternalPostUrlsFromLine(line: string, options?: string | InternalPostUrlExtractionOptions): InternalPostUrlInlineMatch[] {
+  const trimmed = line.trim()
+  if (!trimmed || isPostCardEmbedTokenLine(trimmed)) {
+    return []
+  }
+
+  const matches: InternalPostUrlInlineMatch[] = []
+  INLINE_INTERNAL_POST_URL_PATTERN.lastIndex = 0
+
+  for (const matched of line.matchAll(INLINE_INTERNAL_POST_URL_PATTERN)) {
+    const prefix = matched[1] ?? ""
+    const rawUrl = matched[2] ?? ""
+    const rawStartIndex = (matched.index ?? 0) + prefix.length
+    const url = trimUrlCandidate(rawUrl)
+    const startIndex = rawStartIndex
+    const endIndex = rawStartIndex + url.length
+
+    if (
+      !url
+      || isInsideInlineCode(line, startIndex)
+      || isMarkdownLinkDestination(line, startIndex)
+      || isMarkdownReferenceDestination(line, startIndex)
+    ) {
+      continue
+    }
+
+    const postUrlMatch = extractInternalPostUrlFromValue(url, options)
+    if (!postUrlMatch) {
+      continue
+    }
+
+    matches.push({
+      ...postUrlMatch,
+      url,
+      startIndex,
+      endIndex,
+    })
+  }
+
+  return matches
+}
+
+export function extractInternalPostUrlFromLine(line: string, options?: string | InternalPostUrlExtractionOptions): InternalPostUrlMatch | null {
+  const matched = extractInternalPostUrlsFromLine(line, options)[0]
+  return matched ? { routeSegment: matched.routeSegment } : null
+}
+
 export function replacePostCardEmbedTokensWithUrls(content: string) {
-  return content
+  const lines: string[] = []
+  for (const line of content
     .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => parsePostCardEmbedToken(line)?.url ?? line)
-    .join("\n")
+    .split("\n")) {
+    const snapshot = parsePostCardEmbedToken(line)
+    if (!snapshot) {
+      lines.push(line)
+      continue
+    }
+
+    if (!isInlinePostCardEmbedTokenLine(line)) {
+      lines.push(snapshot.url)
+    }
+  }
+
+  return lines.join("\n")
 }
 
 export function replacePostCardEmbedTokensForSummary(content: string) {
-  return content
+  const lines: string[] = []
+  for (const line of content
     .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => {
-      const snapshot = parsePostCardEmbedToken(line)
-      return snapshot ? `站内帖子：${snapshot.title}` : line
-    })
-    .join("\n")
+    .split("\n")) {
+    const snapshot = parsePostCardEmbedToken(line)
+    if (!snapshot) {
+      lines.push(line)
+      continue
+    }
+
+    if (!isInlinePostCardEmbedTokenLine(line)) {
+      lines.push(`站内帖子：${snapshot.title}`)
+    }
+  }
+
+  return lines.join("\n")
 }
 
 function formatMetric(value: number) {
@@ -324,7 +502,7 @@ function renderMetric(type: "comment" | "view" | "like", value: number, label: s
 }
 
 export function renderPostCardEmbedHtml(line: string) {
-  const snapshot = parsePostCardEmbedToken(line)
+  const snapshot = parsePostCardEmbedTokenWithMode(line)?.snapshot ?? null
   if (!snapshot) {
     return null
   }

@@ -13,7 +13,7 @@ import { defaultSiteSettingsCreateInput } from "@/lib/site-settings-defaults"
 import { DEFAULT_GOD_COMMENT_AUTO_LIKE_THRESHOLD } from "@/lib/god-comment-settings"
 import { DEFAULT_THEME_CUSTOMIZATION_SETTINGS, type BuiltInThemePreset, type EditableThemePresetDefinition, type FontSizePreset, type FontSizePresetDefinition, type ThemeCustomizationSettings, type ThemeRuntimeSettings } from "@/lib/theme"
 import type { InteractionGateCondition, InteractionGateSettings } from "@/lib/site-settings"
-import type { LeftSidebarDisplayMode, PostSlugGenerationMode, RegistrationEmailTemplateSettings, SiteSearchSettings, SiteTippingGiftItem } from "@/lib/site-settings"
+import type { LeftSidebarDisplayMode, LeftSidebarHomeSettings, PostSlugGenerationMode, RegistrationEmailTemplateSettings, SiteSearchSettings, SiteTippingGiftItem } from "@/lib/site-settings"
 import type { PasswordStrength } from "@/lib/password-policy"
 
 export interface AdminBasicSettingsInitialSettings {
@@ -44,6 +44,7 @@ export interface AdminBasicSettingsInitialSettings {
   homeSidebarAnnouncementsEnabled: boolean
   userProfileIpLocationEnabled: boolean
   leftSidebarDisplayMode: LeftSidebarDisplayMode
+  leftSidebarHome: LeftSidebarHomeSettings
   theme: ThemeRuntimeSettings
   postSlugGenerationMode: PostSlugGenerationMode
   footerCopyrightText: string
@@ -185,6 +186,9 @@ export interface AdminBasicSettingsDraft {
   homeSidebarAnnouncementsEnabled: boolean
   userProfileIpLocationEnabled: boolean
   leftSidebarDisplayMode: LeftSidebarDisplayMode
+  leftSidebarHomeEnabled: boolean
+  leftSidebarHomeName: string
+  leftSidebarHomeIcon: string
   defaultThemePreset: BuiltInThemePreset
   defaultFontSizePreset: FontSizePreset
   fontSizePresets: Record<FontSizePreset, FontSizePresetDefinition>
@@ -418,6 +422,9 @@ export function createAdminBasicSettingsDraft(initialSettings: AdminBasicSetting
     homeSidebarAnnouncementsEnabled: coerceBoolean(initialSettings.homeSidebarAnnouncementsEnabled, true),
     userProfileIpLocationEnabled: coerceBoolean(initialSettings.userProfileIpLocationEnabled, false),
     leftSidebarDisplayMode: initialSettings.leftSidebarDisplayMode ?? "DEFAULT",
+    leftSidebarHomeEnabled: coerceBoolean(initialSettings.leftSidebarHome?.enabled, true),
+    leftSidebarHomeName: coerceString(initialSettings.leftSidebarHome?.name, "首页"),
+    leftSidebarHomeIcon: coerceString(initialSettings.leftSidebarHome?.icon, "🏠"),
     defaultThemePreset: themeCustomization.defaultThemePreset,
     defaultFontSizePreset: themeCustomization.defaultFontSizePreset,
     fontSizePresets: themeCustomization.fontSizePresets,
@@ -581,6 +588,11 @@ export function buildAdminBasicSettingsPayload(draft: AdminBasicSettingsDraft, m
       homeSidebarAnnouncementsEnabled: draft.homeSidebarAnnouncementsEnabled,
       userProfileIpLocationEnabled: draft.userProfileIpLocationEnabled,
       leftSidebarDisplayMode: draft.leftSidebarDisplayMode,
+      leftSidebarHome: {
+        enabled: draft.leftSidebarHomeEnabled,
+        name: draft.leftSidebarHomeName,
+        icon: draft.leftSidebarHomeIcon,
+      },
       themeCustomization: {
         defaultThemePreset: draft.defaultThemePreset,
         defaultFontSizePreset: draft.defaultFontSizePreset,

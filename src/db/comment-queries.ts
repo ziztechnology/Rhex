@@ -507,6 +507,32 @@ export async function findFlatCommentPositionLookupsByPostId(params: {
   }
 }
 
+export async function findCommentPositionByPostId(params: {
+  postId: string
+  commentId: string
+  sort: "oldest" | "newest"
+  pageSize: number
+  parentOnly?: boolean
+  viewerUserId?: number
+  includeHidden?: boolean
+  includePendingOwn?: boolean
+  includePendingAll?: boolean
+}): Promise<CommentPositionRow | null> {
+  const [position] = await findCommentPositionsByPostId({
+    postId: params.postId,
+    commentIds: [params.commentId],
+    pageSize: params.pageSize,
+    order: params.sort === "newest" ? "flat-newest" : "flat-oldest",
+    parentOnly: params.parentOnly,
+    viewerUserId: params.viewerUserId,
+    includeHidden: params.includeHidden,
+    includePendingOwn: params.includePendingOwn,
+    includePendingAll: params.includePendingAll,
+  })
+
+  return position ?? null
+}
+
 export function countRootCommentsByPostId(params: {
   postId: string
   viewerUserId?: number
