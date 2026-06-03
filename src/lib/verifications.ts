@@ -84,12 +84,8 @@ export type VerificationTypeDetail = {
 
 export type VerificationDetailApplication = {
   id: string
-  submittedAt: string
-  reviewedAt?: string | null
-  content?: string | null
   customIconText?: string | null
   customDescription?: string | null
-  formResponse: Record<string, string>
   user: {
     id: number
     username: string
@@ -233,12 +229,8 @@ function mapApplication(application: {
 
 function mapDetailApplication(application: {
   id: string
-  submittedAt: Date
-  reviewedAt: Date | null
-  content: string | null
   customIconText: string | null
   customDescription: string | null
-  formResponseJson?: string | null
   user: {
     id: number
     username: string
@@ -249,12 +241,8 @@ function mapDetailApplication(application: {
 }): VerificationDetailApplication {
   return {
     id: application.id,
-    submittedAt: application.submittedAt.toISOString(),
-    reviewedAt: application.reviewedAt?.toISOString() ?? null,
-    content: application.content,
     customIconText: application.customIconText,
     customDescription: application.customDescription,
-    formResponse: parseFormResponseJson(application.formResponseJson),
     user: {
       id: application.user.id,
       username: application.user.username,

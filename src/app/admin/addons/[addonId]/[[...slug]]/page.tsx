@@ -3,12 +3,13 @@ import { notFound, redirect } from "next/navigation"
 
 import type { AddonExtensionPointItem } from "@/addons-host/admin-types"
 import { AddonRenderBlock, executeAddonPage, findLoadedAddonById, isAddonRedirectResult } from "@/addons-host"
+import { clearAddonsRuntimeCache } from "@/addons-host/runtime/loader"
 import { AddonInfoModalTrigger } from "@/components/admin/addon-info-modal-trigger"
 import { AddonManagementActionButtons } from "@/components/admin/addon-management-action-buttons"
 import { AdminShell } from "@/components/admin/admin-shell"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAddonAdminDetailData } from "@/addons-host/management"
+import { getAddonAdminDetailData, getAddonAdminItem } from "@/addons-host/management"
 import { requireAdminUser } from "@/lib/admin"
 import { getSiteSettings } from "@/lib/site-settings"
 
@@ -21,10 +22,10 @@ interface AdminAddonPageProps {
 
 export async function generateMetadata({ params }: AdminAddonPageProps): Promise<Metadata> {
   const [{ addonId }, settings] = await Promise.all([params, getSiteSettings()])
-  const addon = await findLoadedAddonById(addonId)
+  const addon = await getAddonAdminItem(addonId)
 
   return {
-    title: `${addon?.manifest.name ?? "插件详情"} - ${settings.siteName}`,
+    title: `${addon?.name ?? "插件详情"} - ${settings.siteName}`,
   }
 }
 
@@ -36,12 +37,15 @@ export default async function AdminAddonDetailPage({ params }: AdminAddonPagePro
   }
 
   const { addonId, slug } = await params
-  const addon = await findLoadedAddonById(addonId)
-  if (!addon) {
-    notFound()
-  }
   const addonAdminDetail = await getAddonAdminDetailData(addonId)
   if (!addonAdminDetail) {
+    notFound()
+  }
+
+  clearAddonsRuntimeCache()
+
+  const addon = await findLoadedAddonById(addonId)
+  if (!addon) {
     notFound()
   }
   const addonAdminItem = addonAdminDetail.item

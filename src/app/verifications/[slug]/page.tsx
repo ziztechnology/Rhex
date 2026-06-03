@@ -13,11 +13,11 @@ import { getHomeAnnouncements } from "@/lib/announcements"
 import { getCurrentUser } from "@/lib/auth"
 import { buildLoginHrefWithRedirect } from "@/lib/auth-redirect"
 import { getBoards } from "@/lib/boards"
-import { formatDateTime, formatNumber } from "@/lib/formatters"
+import { formatNumber } from "@/lib/formatters"
 import { getHomeSidebarHotTopics, resolveSidebarUser } from "@/lib/home-sidebar"
 import { readSearchParam } from "@/lib/search-params"
 import { getSiteSettings } from "@/lib/site-settings"
-import { getVerificationTypeDetailBySlug, type VerificationFormField } from "@/lib/verifications"
+import { getVerificationTypeDetailBySlug } from "@/lib/verifications"
 import { getZones } from "@/lib/zones"
 
 export const dynamic = "force-dynamic"
@@ -84,11 +84,6 @@ export default async function VerificationDetailPage(props: VerificationDetailPa
   const applicationCost = verification.pointsCost > 0
     ? `${formatNumber(verification.pointsCost)} ${settings.pointName}`
     : "免费申请"
-  const fieldSummary = verification.formFields.length > 0
-    ? `${verification.formFields.length} 个字段`
-    : verification.needRemark
-      ? "申请说明"
-      : "基础说明"
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -137,7 +132,7 @@ export default async function VerificationDetailPage(props: VerificationDetailPa
                     <div className="mt-6 grid gap-3 text-left sm:grid-cols-3">
                       <VerificationStatCard label="已认证人数" value={`${formatNumber(verification.approvedUserCount)} 人`} />
                       <VerificationStatCard label="申请成本" value={applicationCost} />
-                      <VerificationStatCard label="审核材料" value={fieldSummary} />
+                      <VerificationStatCard label="公开展示" value="个性描述" />
                     </div>
                     <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                       <Link href={applyHref}>
@@ -159,7 +154,6 @@ export default async function VerificationDetailPage(props: VerificationDetailPa
                       name: verification.name,
                       color: verification.color,
                       iconText: verification.iconText,
-                      formFields: verification.formFields,
                     }}
                     application={verification.featuredApplication}
                   />
@@ -204,7 +198,6 @@ function VerificationApplicationCard({
     name: string
     color: string
     iconText: string
-    formFields: VerificationFormField[]
   }
   application: NonNullable<Awaited<ReturnType<typeof getVerificationTypeDetailBySlug>>>["featuredApplication"]
 }) {
@@ -213,10 +206,7 @@ function VerificationApplicationCard({
   }
 
   const effectiveIcon = application.customIconText?.trim() || verification.iconText
-  const fieldEntries = buildApplicationFieldEntries(verification.formFields, application.formResponse)
   const customDescription = application.customDescription?.trim()
-  const applicationContent = application.content?.trim()
-  const showApplicationContent = applicationContent && fieldEntries.length === 0
 
   return (
     <section className="rounded-xl border border-border bg-card px-5 py-6 shadow-xs sm:px-7">
@@ -270,46 +260,19 @@ function VerificationApplicationCard({
               {customDescription}
             </p>
           </div>
-        ) : null}
-
-        {fieldEntries.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {fieldEntries.map((field) => (
-              <div key={field.id} className="rounded-xl border border-border bg-background/70 px-4 py-3">
-                <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-                  {field.value}
-                </p>
-              </div>
-            ))}
+        ) : (
+          <div className="rounded-xl border border-border bg-background/70 px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              个性描述
+            </p>
+            <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              暂未设置个性描述
+            </p>
           </div>
-        ) : null}
-
-
-
+        )}
       </div>
     </section>
   )
-}
-
-function buildApplicationFieldEntries(fields: VerificationFormField[], formResponse: Record<string, string>) {
-  const fieldIds = new Set(fields.map((field) => field.id))
-  const knownEntries = fields
-    .map((field) => ({
-      id: field.id,
-      label: field.label,
-      value: String(formResponse[field.id] ?? "").trim(),
-    }))
-    .filter((field) => field.value.length > 0)
-  const fallbackEntries = Object.entries(formResponse)
-    .filter(([key, value]) => !fieldIds.has(key) && String(value ?? "").trim().length > 0)
-    .map(([key, value]) => ({
-      id: key,
-      label: key,
-      value: String(value ?? "").trim(),
-    }))
-
-  return [...knownEntries, ...fallbackEntries]
 }
 
 function VerificationStatCard({

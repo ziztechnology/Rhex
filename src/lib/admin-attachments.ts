@@ -3,7 +3,13 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/db/client"
 import type { Prisma } from "@/db/types"
 import { createAdminLogEntry } from "@/db/admin-log-queries"
-import { enqueueBackgroundJob } from "@/lib/background-jobs"
+import {
+  deleteBackgroundJobById,
+  enqueueBackgroundJob,
+  findBackgroundJobById,
+  type BackgroundJobDeleteResult,
+  type BackgroundJobEnvelope,
+} from "@/lib/background-jobs"
 import { formatDateTime } from "@/lib/formatters"
 import { PublicRouteError } from "@/lib/public-route-error"
 import { toPrismaJsonValue } from "@/lib/shared/prisma-json"
@@ -122,12 +128,18 @@ export interface AdminAttachmentJobEnqueueResult {
   job: AdminAttachmentReferenceScanJobSummary
 }
 
+export interface AdminAttachmentJobRepairResult {
+  repairedJobs: AdminAttachmentReferenceScanJobSummary[]
+  removedBackgroundJobs: BackgroundJobDeleteResult[]
+}
+
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 100
 const CLEANUP_DEFAULT_LIMIT = 100
 const CLEANUP_MAX_LIMIT = 500
 const REFERENCE_SCAN_BATCH_SIZE = 50
 const ACTIVE_REFERENCE_SCAN_STATUSES: AdminAttachmentReferenceScanStatus[] = ["QUEUED", "RUNNING"]
+const REPAIRABLE_REFERENCE_SCAN_STATUSES: AdminAttachmentReferenceScanStatus[] = ["QUEUED"]
 
 const uploadListSelect = {
   id: true,
@@ -972,25 +984,123 @@ async function getReferenceScanJobOrThrow(scanJobId: string) {
   return job
 }
 
-async function findActiveReferenceScanJob(kind: AdminAttachmentReferenceScanKind) {
-  return prisma.uploadReferenceScanJob.findFirst({
-    where: { kind, status: { in: ACTIVE_REFERENCE_SCAN_STATUSES } },
-    orderBy: { createdAt: "desc" },
-    select: uploadReferenceScanJobSelect,
-  })
+function getReferenceBackgroundJobName(kind: AdminAttachmentReferenceScanKind) {
+  return kind === "CLEANUP" ? ATTACHMENT_CLEANUP_JOB_NAME : ATTACHMENT_REFERENCE_SCAN_JOB_NAME
 }
 
-async function markReferenceScanJobFailed(scanJobId: string, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error)
-  await prisma.uploadReferenceScanJob.update({
+function matchesReferenceBackgroundJob(row: UploadReferenceScanJobRow) {
+  return (job: BackgroundJobEnvelope) => {
+    if (job.name !== getReferenceBackgroundJobName(normalizeScanKind(row.kind))) {
+      return false
+    }
+
+    const payload = job.payload as { scanJobId?: unknown; cleanupJobId?: unknown }
+    return payload.scanJobId === row.id || payload.cleanupJobId === row.id
+  }
+}
+
+async function findActiveReferenceScanJob(kind: AdminAttachmentReferenceScanKind) {
+  const jobs = await prisma.uploadReferenceScanJob.findMany({
+    where: { kind, status: { in: ACTIVE_REFERENCE_SCAN_STATUSES } },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: uploadReferenceScanJobSelect,
+  })
+
+  for (const job of jobs) {
+    const reconciled = await reconcileQueuedReferenceScanJob(job)
+    if (ACTIVE_REFERENCE_SCAN_STATUSES.includes(normalizeScanStatus(reconciled.status))) {
+      return reconciled
+    }
+  }
+
+  return null
+}
+
+async function markReferenceScanJobFailedWithMessage(scanJobId: string, message: string) {
+  const job = await prisma.uploadReferenceScanJob.update({
     where: { id: scanJobId },
     data: {
       status: "FAILED",
       errorMessage: message.slice(0, 1000),
       finishedAt: new Date(),
     },
+    select: uploadReferenceScanJobSelect,
   })
   revalidateAdminAttachmentManagement()
+
+  return job
+}
+
+async function reconcileQueuedReferenceScanJob(job: UploadReferenceScanJobRow) {
+  if (normalizeScanStatus(job.status) !== "QUEUED" || !job.backgroundJobId) {
+    return job
+  }
+
+  const backgroundJob = await findBackgroundJobById(job.backgroundJobId, {
+    match: matchesReferenceBackgroundJob(job),
+  }).catch(() => null)
+
+  if (backgroundJob) {
+    return job
+  }
+
+  return markReferenceScanJobFailedWithMessage(
+    job.id,
+    "后台队列里已找不到对应任务，系统已自动解除排队状态。请确认 worker 已重启后重新发起扫描或清理。",
+  )
+}
+
+async function markReferenceScanJobFailed(scanJobId: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  await markReferenceScanJobFailedWithMessage(scanJobId, message)
+}
+
+export async function repairQueuedAttachmentJobs(input: {
+  adminId?: number
+  ip?: string | null
+} = {}): Promise<AdminAttachmentJobRepairResult> {
+  const queuedJobs = await prisma.uploadReferenceScanJob.findMany({
+    where: { status: { in: REPAIRABLE_REFERENCE_SCAN_STATUSES } },
+    orderBy: { createdAt: "desc" },
+    select: uploadReferenceScanJobSelect,
+  })
+  const repairedJobs: AdminAttachmentReferenceScanJobSummary[] = []
+  const removedBackgroundJobs: BackgroundJobDeleteResult[] = []
+
+  for (const job of queuedJobs) {
+    if (job.backgroundJobId) {
+      const removed = await deleteBackgroundJobById(job.backgroundJobId, {
+        match: matchesReferenceBackgroundJob(job),
+      })
+      removedBackgroundJobs.push(removed)
+    }
+
+    const repaired = await markReferenceScanJobFailedWithMessage(
+      job.id,
+      "后台任务已被管理员解除。通常是 worker 未重启导致新任务进入死信队列，请重启 worker 后重新发起扫描或清理。",
+    )
+    const summary = mapReferenceScanJob(repaired)
+    if (summary) {
+      repairedJobs.push(summary)
+    }
+  }
+
+  if (input.adminId && repairedJobs.length > 0) {
+    await createAdminLogEntry({
+      adminId: input.adminId,
+      action: "attachments.repair-queued-jobs",
+      targetType: "UploadReferenceScanJob",
+      targetId: "bulk",
+      detail: `解除卡住的附件后台任务 ${repairedJobs.length} 个，移除后台队列/死信记录 ${removedBackgroundJobs.filter((item) => item.removed).length} 个`,
+      ip: input.ip,
+    })
+  }
+
+  return {
+    repairedJobs,
+    removedBackgroundJobs,
+  }
 }
 
 export async function enqueueAttachmentReferenceScan(input: {

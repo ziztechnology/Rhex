@@ -6,6 +6,7 @@ import {
   deleteOrphanUploadById,
   enqueueAttachmentReferenceScan,
   getAdminAttachmentManagement,
+  repairQueuedAttachmentJobs,
 } from "@/lib/admin-attachments"
 import { getRequestIp } from "@/lib/request-ip"
 
@@ -65,6 +66,16 @@ export const POST = createAdminRouteHandler<unknown>(async ({ request, adminUser
 
     revalidatePath("/admin")
     return apiSuccess(result, "无引用资源已删除")
+  }
+
+  if (action === "repair-stuck-jobs") {
+    const result = await repairQueuedAttachmentJobs({
+      adminId: adminUser.id,
+      ip: getRequestIp(request),
+    })
+
+    revalidatePath("/admin")
+    return apiSuccess(result, result.repairedJobs.length > 0 ? "已解除卡住的附件后台任务" : "没有需要解除的附件后台任务")
   }
 
   const result = await getAdminAttachmentManagement({

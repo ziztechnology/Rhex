@@ -33,6 +33,7 @@ import { useAdminMutation } from "@/hooks/use-admin-mutation"
 import { adminPost } from "@/lib/admin-client"
 import type {
   AdminAttachmentJobEnqueueResult,
+  AdminAttachmentJobRepairResult,
   AdminAttachmentManagementResult,
   AdminAttachmentReferenceScanJobSummary,
 } from "@/lib/admin-attachments"
@@ -79,6 +80,15 @@ function isJobEnqueueResult(value: unknown): value is AdminAttachmentJobEnqueueR
     && typeof item.job.status === "string"
 }
 
+function isJobRepairResult(value: unknown): value is AdminAttachmentJobRepairResult {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const item = value as Partial<AdminAttachmentJobRepairResult>
+  return Array.isArray(item.repairedJobs) && Array.isArray(item.removedBackgroundJobs)
+}
+
 function normalizeReferenceFilter(value: string): AdminAttachmentReferenceFilter {
   return value === "REFERENCED" || value === "ORPHAN" ? value : "ALL"
 }
@@ -98,6 +108,7 @@ export function AdminAttachmentManager({ data }: AdminAttachmentManagerProps) {
   const cleanupInProgress = !!activeCleanup
   const canStartScan = !scanInProgress && !cleanupInProgress
   const canStartCleanup = hasSnapshot && canStartScan
+  const hasQueuedJob = activeScan?.status === "QUEUED" || activeCleanup?.status === "QUEUED"
 
   const bucketOptions = useMemo(() => [
     { value: "ALL", label: "全部目录" },
@@ -174,6 +185,21 @@ export function AdminAttachmentManager({ data }: AdminAttachmentManagerProps) {
       }),
       successTitle: "清理已入队",
       errorTitle: "启动失败",
+      refreshRouter: true,
+    })
+  }
+
+  function repairStuckJobs() {
+    runMutation({
+      mutation: () => adminPost<AdminAttachmentJobRepairResult>("/api/admin/attachments", {
+        action: "repair-stuck-jobs",
+      }, {
+        validateData: isJobRepairResult,
+        invalidDataMessage: "后台任务恢复返回格式不正确",
+        defaultErrorMessage: "解除卡住任务失败",
+      }),
+      successTitle: "任务已解除",
+      errorTitle: "解除失败",
       refreshRouter: true,
     })
   }
@@ -261,6 +287,10 @@ export function AdminAttachmentManager({ data }: AdminAttachmentManagerProps) {
             <Button type="button" variant="destructive" className="rounded-full" disabled={isPending || !canStartCleanup} onClick={runCleanup}>
               {isPending && !scanInProgress ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Trash2 data-icon="inline-start" />}
               后台清理无引用
+            </Button>
+            <Button type="button" variant="outline" className="rounded-full" disabled={isPending || !hasQueuedJob} onClick={repairStuckJobs}>
+              {isPending && hasQueuedJob ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <RefreshCw data-icon="inline-start" />}
+              解除卡住任务
             </Button>
           </div>
         </CardHeader>

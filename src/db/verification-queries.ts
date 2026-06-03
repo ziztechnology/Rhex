@@ -51,10 +51,10 @@ export function findApprovedUserVerificationByTypeAndUsername(typeId: string, us
       user: { username },
     },
     orderBy: [{ reviewedAt: "desc" }, { submittedAt: "desc" }],
-    include: {
-      type: {
-        select: verificationApplicationTypeSelect,
-      },
+    select: {
+      id: true,
+      customIconText: true,
+      customDescription: true,
       user: {
         select: {
           id: true,
