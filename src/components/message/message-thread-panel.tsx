@@ -218,7 +218,6 @@ function MessageThreadPanelContent({
 
     if (!element) {
       setDraft((current) => `${current}${emoji}`)
-      setShowEmojiPanel(false)
       return
     }
 
@@ -227,7 +226,6 @@ function MessageThreadPanelContent({
     const nextDraft = `${draft.slice(0, selectionStart)}${emoji}${draft.slice(selectionEnd)}`
 
     setDraft(nextDraft)
-    setShowEmojiPanel(false)
 
     requestAnimationFrame(() => {
       element.focus()
