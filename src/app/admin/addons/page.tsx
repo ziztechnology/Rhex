@@ -29,10 +29,11 @@ export default async function AdminAddonsPage() {
 
   return (
     <AdminShell
-      currentKey="apps"
+      currentKey="addons"
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription="查看已安装的插件、页面、API、Provider、Hook 和挂载状态。"
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },

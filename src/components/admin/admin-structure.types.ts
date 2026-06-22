@@ -1,5 +1,6 @@
 import type { BoardSidebarLinkItem } from "@/lib/board-sidebar-config"
 import type { BoardItem, ZoneItem } from "@/lib/admin-structure-management"
+import type { PostEditWindowRuleSubject } from "@/lib/post-edit-window"
 
 export interface BoardApplicationZoneOption {
   id: string
@@ -101,6 +102,13 @@ export interface BoardApplicationReviewFormState {
 
 export type BoardSidebarLinkDraft = BoardSidebarLinkItem
 
+export interface PostEditRuleDraft {
+  subject: PostEditWindowRuleSubject
+  threshold: string
+  targetId: string
+  minutes: string
+}
+
 export interface StructureFormState {
   name: string
   slug: string
@@ -136,6 +144,8 @@ export interface StructureFormState {
   postRequiredBadgeIds: string[]
   replyRequiredVerificationTypeIds: string[]
   replyRequiredBadgeIds: string[]
+  postEditRuleMode: "inherit" | "custom"
+  postEditRules: PostEditRuleDraft[]
   requirePostReview: boolean
   requireCommentReview: boolean
   showInHomeFeed: string

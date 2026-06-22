@@ -37,7 +37,7 @@ import { applyPointDelta, prepareScopedPointDelta } from "@/lib/point-center"
 import { normalizePostAttachmentInputs, syncPostAttachments } from "@/lib/post-attachments"
 import { processInternalPostCardEmbeds } from "@/lib/post-card-embed.server"
 import { buildPostContentDocument, getAllPostContentText, serializePostContentDocument } from "@/lib/post-content"
-import { resolvePostEditableUntil } from "@/lib/post-edit-window"
+import { resolvePostEditableUntil, resolvePostEditWindowMinutes } from "@/lib/post-edit-window"
 import { createPostRedPacketAfterPostCreated, normalizePostRedPacketConfig } from "@/lib/post-red-packets"
 import type { StoredPostRewardPoolConfig } from "@/lib/post-reward-pool-config"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
@@ -172,16 +172,21 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
   const loginUnlockSafety = loginUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: loginUnlockContent }) : null
   const replyUnlockSafety = replyUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: replyUnlockContent }) : null
   const purchaseUnlockSafety = purchaseUnlockContent ? await enforceSensitiveText({ scene: "post.content", text: purchaseUnlockContent }) : null
+  const postCardEmbedOptions = {
+    requestUrl: options.request.url,
+    requestHeaders: options.request.headers,
+    postLinkDisplayMode: settings.postLinkDisplayMode,
+  }
   const [
     publicContentWithCards,
     loginUnlockContentWithCards,
     replyUnlockContentWithCards,
     purchaseUnlockContentWithCards,
   ] = await Promise.all([
-    processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }),
-    loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
-    replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
-    purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: options.request.url, requestHeaders: options.request.headers }) : "",
+    processInternalPostCardEmbeds(contentSafety.sanitizedText, postCardEmbedOptions),
+    loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
+    replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
+    purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
   ])
 
   const contentDocument = buildPostContentDocument({
@@ -345,6 +350,11 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
     : statusMode === "PUBLISHED"
       ? false
       : !skipsAutoReview && Boolean(boardContext.settings.requirePostReview)
+  const postEditableMinutes = resolvePostEditWindowMinutes(
+    settings.postEditableMinutes,
+    boardContext.settings.postEditRules,
+    author,
+  )
   const contentAdjusted = Boolean(
     titleHookAdjusted
     || contentHookAdjusted
@@ -391,7 +401,7 @@ export async function createPostFlow(body: unknown, options: CreatePostFlowOptio
           lotteryParticipantGoal: postType === "LOTTERY" ? (lotteryData?.participantGoal ?? null) : null,
           createdAt,
           activityAt: createdAt,
-          editableUntil: resolvePostEditableUntil(createdAt, settings.postEditableMinutes),
+          editableUntil: resolvePostEditableUntil(createdAt, postEditableMinutes),
           publishedAt: shouldPending ? null : createdAt,
           reviewNote: shouldPending ? "当前节点开启发帖审核，帖子已进入审核" : null,
           pollOptions: postType === "POLL" ? { create: pollOptions.map((option, index) => ({ content: option, sortOrder: index })) } : undefined,

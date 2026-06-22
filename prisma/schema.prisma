@@ -989,6 +989,7 @@ model Zone {
   postRequiredBadgeIds             String[]           @default([])
   replyRequiredVerificationTypeIds String[]           @default([])
   replyRequiredBadgeIds            String[]           @default([])
+  postEditRulesJson             Json?
   postListDisplayMode           String?
   postListLoadMode              String?
   createdAt                     DateTime             @default(now()) @db.Timestamptz(3)
@@ -1039,6 +1040,7 @@ model Board {
   postRequiredBadgeIds             String[]                 @default([])
   replyRequiredVerificationTypeIds String[]                 @default([])
   replyRequiredBadgeIds            String[]                 @default([])
+  postEditRulesJson               Json?
   postListDisplayMode             String?
   postListLoadMode                String?
   postCount                       Int                      @default(0)

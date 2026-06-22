@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/toast"
 import type {
   BoardSidebarLinkDraft,
   ModalMode,
+  PostEditRuleDraft,
   StructureFormState,
 } from "@/components/admin/admin-structure.types"
 import {
@@ -26,6 +27,7 @@ import {
 } from "@/components/admin/admin-structure.shared"
 import type { ZoneItem } from "@/lib/admin-structure-management"
 import type { StructureModeratorItem } from "@/lib/admin-structure-management"
+import { formatPostEditWindowLabel, type PostEditWindowRuleSubject } from "@/lib/post-edit-window"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY, POST_LIST_DISPLAY_MODE_WEIBO } from "@/lib/post-list-display"
 import { POST_LIST_LOAD_MODE_INFINITE, POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { Plus } from "lucide-react"
@@ -283,6 +285,34 @@ export function StructureAccessTab({
     )
   }
 
+  function addPostEditRule() {
+    updateField("postEditRules", [
+      ...form.postEditRules,
+      {
+        subject: "vip",
+        threshold: "1",
+        targetId: "",
+        minutes: "-1",
+      },
+    ])
+  }
+
+  function updatePostEditRule(index: number, patch: Partial<PostEditRuleDraft>) {
+    updateField(
+      "postEditRules",
+      form.postEditRules.map((rule, currentIndex) => currentIndex === index ? {
+        ...rule,
+        ...patch,
+        ...(patch.subject === "vip" || patch.subject === "level" ? { targetId: "" } : {}),
+        ...(patch.subject === "verification" || patch.subject === "badge" ? { threshold: "1" } : {}),
+      } : rule),
+    )
+  }
+
+  function removePostEditRule(index: number) {
+    updateField("postEditRules", form.postEditRules.filter((_, currentIndex) => currentIndex !== index))
+  }
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border p-5">
@@ -370,11 +400,172 @@ export function StructureAccessTab({
       </div>
 
       <div className="rounded-xl border border-border p-5">
+        <h4 className="text-sm font-semibold">发帖编辑窗口策略</h4>
+        <p className="mt-2 text-xs leading-6 text-muted-foreground">未命中规则时使用站点设置里的帖子可编辑分钟数；命中多条规则时取最长时间，`-1` 表示不受时间限制。</p>
+        <div className="mt-4">
+          <PostEditRulesEditor
+            mode={form.postEditRuleMode}
+            isBoard={isBoard}
+            rules={form.postEditRules}
+            verificationOptions={verificationOptions}
+            badgeOptions={badgeOptions}
+            onModeChange={(value) => updateField("postEditRuleMode", value)}
+            onAdd={addPostEditRule}
+            onUpdate={updatePostEditRule}
+            onRemove={removePostEditRule}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border p-5">
         <h4 className="text-sm font-semibold">审核策略</h4>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Toggle label="开启发帖审核" checked={form.requirePostReview} onChange={(value) => updateField("requirePostReview", value)} />
           <Toggle label="开启回帖审核" checked={form.requireCommentReview} onChange={(value) => updateField("requireCommentReview", value)} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+function PostEditRulesEditor({
+  mode,
+  isBoard,
+  rules,
+  verificationOptions,
+  badgeOptions,
+  onModeChange,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  mode: "inherit" | "custom"
+  isBoard: boolean
+  rules: PostEditRuleDraft[]
+  verificationOptions: PermissionOption[]
+  badgeOptions: PermissionOption[]
+  onModeChange: (value: "inherit" | "custom") => void
+  onAdd: () => void
+  onUpdate: (index: number, patch: Partial<PostEditRuleDraft>) => void
+  onRemove: (index: number) => void
+}) {
+  const disabled = isBoard && mode === "inherit"
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-border/70 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h5 className="text-sm font-medium">特殊身份编辑时间</h5>
+          <p className="mt-1 text-xs text-muted-foreground">{rules.length > 0 ? `已配置 ${rules.length} 条规则` : "未配置时使用站点默认编辑时间"}</p>
+        </div>
+        {isBoard ? (
+          <SelectField
+            label="策略来源"
+            value={mode}
+            onValueChange={(value) => onModeChange(value === "custom" ? "custom" : "inherit")}
+            options={[
+              { value: "inherit", label: "继承分区" },
+              { value: "custom", label: "自定义规则" },
+            ]}
+          />
+        ) : null}
+      </div>
+
+      <div className={disabled ? "pointer-events-none flex flex-col gap-3 opacity-50" : "flex flex-col gap-3"}>
+        {rules.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            暂无特殊编辑窗口规则。
+          </div>
+        ) : null}
+        {rules.map((rule, index) => (
+          <PostEditRuleRow
+            key={`post-edit-rule-${index}`}
+            rule={rule}
+            index={index}
+            verificationOptions={verificationOptions}
+            badgeOptions={badgeOptions}
+            onUpdate={onUpdate}
+            onRemove={onRemove}
+          />
+        ))}
+        <div>
+          <Button type="button" variant="outline" className="h-9 rounded-full px-4 text-xs" onClick={onAdd}>
+            新增编辑规则
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PostEditRuleRow({
+  rule,
+  index,
+  verificationOptions,
+  badgeOptions,
+  onUpdate,
+  onRemove,
+}: {
+  rule: PostEditRuleDraft
+  index: number
+  verificationOptions: PermissionOption[]
+  badgeOptions: PermissionOption[]
+  onUpdate: (index: number, patch: Partial<PostEditRuleDraft>) => void
+  onRemove: (index: number) => void
+}) {
+  const subjectOptions: Array<{ value: PostEditWindowRuleSubject; label: string }> = [
+    { value: "vip", label: "VIP 等级" },
+    { value: "level", label: "用户等级" },
+    { value: "verification", label: "指定认证" },
+    { value: "badge", label: "指定勋章" },
+  ]
+  const identityOptions = rule.subject === "verification" ? verificationOptions : badgeOptions
+  const targetLabel = rule.subject === "verification" ? "认证类型" : "勋章"
+  const minutes = Number(rule.minutes)
+  const minutesHint = Number.isFinite(minutes)
+    ? formatPostEditWindowLabel(minutes)
+    : "填写 -1 表示永久"
+
+  return (
+    <div className="rounded-[18px] border border-border bg-card/60 p-3">
+      <div className="grid gap-3 lg:grid-cols-[150px_minmax(160px,1fr)_minmax(160px,1fr)_auto] lg:items-end">
+        <SelectField
+          label="身份类型"
+          value={rule.subject}
+          onValueChange={(value) => onUpdate(index, { subject: value as PostEditWindowRuleSubject })}
+          options={subjectOptions}
+        />
+        {rule.subject === "vip" || rule.subject === "level" ? (
+          <Field
+            label={rule.subject === "vip" ? "最低 VIP 等级" : "最低用户等级"}
+            value={rule.threshold}
+            onChange={(value) => onUpdate(index, { threshold: value })}
+            placeholder="例如 3"
+          />
+        ) : (
+          <SelectField
+            label={targetLabel}
+            value={rule.targetId}
+            onValueChange={(value) => onUpdate(index, { targetId: value })}
+            options={[
+              { value: "", label: `请选择${targetLabel}` },
+              ...identityOptions.map((option) => ({
+                value: option.id,
+                label: `${option.name}${option.status ? "" : "（停用）"}`,
+              })),
+            ]}
+          />
+        )}
+        <Field
+          label="可编辑分钟数"
+          value={rule.minutes}
+          onChange={(value) => onUpdate(index, { minutes: value })}
+          placeholder="-1 永久，0 不可编辑"
+          help={<p>{minutesHint}</p>}
+        />
+        <Button type="button" variant="outline" className="h-9 rounded-full px-3 text-xs" onClick={() => onRemove(index)}>
+          删除
+        </Button>
       </div>
     </div>
   )

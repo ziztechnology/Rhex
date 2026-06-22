@@ -1,17 +1,16 @@
 import Link from "next/link"
-import { ArrowUpRight, BookText, Ellipsis, Link2 } from "lucide-react"
+import { ArrowUpRight, BookText, Link2 } from "lucide-react"
 
 import { AddonSlotRenderer } from "@/addons-host"
+import { BoardModeratorsActions } from "@/components/board/board-moderators-dialog"
 import { HomeSidebarPanels } from "@/components/home/home-sidebar-panels"
 import { LevelIcon } from "@/components/level-icon"
 import { MarkdownContent } from "@/components/markdown-content"
-import { UserAvatar } from "@/components/user/user-avatar"
 import type { AnnouncementItem } from "@/lib/announcements"
 import type { SiteBoardItem, BoardModeratorItem } from "@/lib/boards"
 import type { SidebarUserCardData } from "@/components/user/sidebar-user-card"
 import type { HomeSidebarPanelItem } from "@/lib/home-sidebar-layout"
 import type { BoardSidebarLinkItem } from "@/lib/board-sidebar-config"
-import { getPublicUserRoleBadgeLabel } from "@/lib/user-presentation"
 
 interface HotTopicItem {
   id: string
@@ -28,6 +27,8 @@ interface BoardSidebarPanelsProps {
   hotTopics: HotTopicItem[]
   board: Pick<SiteBoardItem, "name" | "slug" | "sidebarLinks" | "rulesMarkdown">
   moderators: BoardModeratorItem[]
+  zoneModerators?: BoardModeratorItem[]
+  boardManagementHref?: string
   announcements?: AnnouncementItem[]
   showAnnouncements?: boolean
   postLinkDisplayMode?: "SLUG" | "ID"
@@ -87,42 +88,12 @@ function BoardLinkCard({ item }: { item: BoardSidebarLinkItem }) {
   )
 }
 
-function BoardModeratorsMenu({ moderators }: { moderators: BoardModeratorItem[] }) {
-  if (moderators.length === 0) {
-    return null
-  }
-
-  return (
-    <details className="relative">
-      <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground [&::-webkit-details-marker]:hidden">
-        <Ellipsis className="h-4 w-4" />
-      </summary>
-      <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-border bg-background p-3 shadow-lg shadow-black/10">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-foreground">节点版主</p>
-          <p className="text-[11px] text-muted-foreground">{moderators.length} 人</p>
-        </div>
-        <div className="space-y-1.5">
-          {moderators.map((moderator) => {
-            const roleLabel = getPublicUserRoleBadgeLabel(moderator)
-
-            return (
-              <Link key={moderator.id} href={`/users/${moderator.username}`} className="flex items-center gap-3 rounded-[16px] px-2 py-2 transition-colors hover:bg-accent/50">
-                <UserAvatar name={moderator.displayName} avatarPath={moderator.avatarPath} size="xs" isVip={moderator.vipLevel > 0} vipLevel={moderator.vipLevel} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{moderator.displayName}</p>
-                  <p className="truncate text-xs text-muted-foreground">@{moderator.username}{roleLabel ? ` · ${roleLabel}` : ""}</p>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
-    </details>
-  )
-}
-
-function BoardRulesPanel({ board, moderators }: Pick<BoardSidebarPanelsProps, "board" | "moderators">) {
+function BoardRulesPanel({
+  board,
+  moderators,
+  zoneModerators = [],
+  boardManagementHref,
+}: Pick<BoardSidebarPanelsProps, "board" | "moderators" | "zoneModerators" | "boardManagementHref">) {
   return (
     <section className="mobile-sidebar-section rounded-xl border border-border bg-card p-4 shadow-xs shadow-black/5 dark:shadow-black/30">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -130,7 +101,12 @@ function BoardRulesPanel({ board, moderators }: Pick<BoardSidebarPanelsProps, "b
           <BookText className="h-4 w-4 text-amber-600" />
           <h3 className="text-sm font-semibold">节点规则</h3>
         </div>
-        <BoardModeratorsMenu moderators={moderators} />
+        <BoardModeratorsActions
+          boardName={board.name}
+          zoneModerators={zoneModerators}
+          boardModerators={moderators}
+          managementHref={boardManagementHref}
+        />
       </div>
       <MarkdownContent
         content={board.rulesMarkdown || DEFAULT_BOARD_RULES_MARKDOWN}
@@ -160,7 +136,7 @@ function BoardLinksPanel({ links }: { links: BoardSidebarLinkItem[] }) {
   )
 }
 
-export function BoardSidebarPanels({ user, hotTopics, board, moderators, announcements = [], showAnnouncements = true, postLinkDisplayMode = "SLUG", createPostHref, siteName, siteDescription, siteLogoPath, siteIconPath }: BoardSidebarPanelsProps) {
+export function BoardSidebarPanels({ user, hotTopics, board, moderators, zoneModerators, boardManagementHref, announcements = [], showAnnouncements = true, postLinkDisplayMode = "SLUG", createPostHref, siteName, siteDescription, siteLogoPath, siteIconPath }: BoardSidebarPanelsProps) {
   const boardSlotProps = {
     boardSlug: board.slug,
     boardName: board.name,
@@ -203,7 +179,7 @@ export function BoardSidebarPanels({ user, hotTopics, board, moderators, announc
     id: `${board.slug}:board-rules`,
     slot: "home-right-top",
     order: 20,
-    content: <BoardRulesPanel board={board} moderators={moderators} />,
+    content: <BoardRulesPanel board={board} moderators={moderators} zoneModerators={zoneModerators} boardManagementHref={boardManagementHref} />,
   })
 
   return (

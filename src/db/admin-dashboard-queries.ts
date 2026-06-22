@@ -141,6 +141,8 @@ async function getAdminDashboardRawDataUncached() {
       pendingVerificationCount: NumericLike
       pendingFriendLinkCount: NumericLike
       pendingRssSourceApplicationCount: NumericLike
+      pendingOAuthClientCount: NumericLike
+      pendingPaymentApplicationCount: NumericLike
       totalFollowerCount: NumericLike
       todayCheckInUserCount: NumericLike
     }>>(Prisma.sql`
@@ -151,6 +153,8 @@ async function getAdminDashboardRawDataUncached() {
         (SELECT COUNT(*) FROM "UserVerification" WHERE status = 'PENDING') AS "pendingVerificationCount",
         (SELECT COUNT(*) FROM "FriendLink" WHERE status = 'PENDING') AS "pendingFriendLinkCount",
         (SELECT COUNT(*) FROM "rss_source_application" WHERE status = 'PENDING') AS "pendingRssSourceApplicationCount",
+        (SELECT COUNT(*) FROM "OAuthClient" WHERE status = 'PENDING') AS "pendingOAuthClientCount",
+        (SELECT COUNT(*) FROM "PaymentApplication" WHERE status = 'PENDING') AS "pendingPaymentApplicationCount",
         (SELECT COALESCE(SUM("followerCount"), 0) FROM "Board") AS "totalFollowerCount",
         (SELECT COUNT(*) FROM "UserCheckInLog" WHERE "checkedInOn" = ${todayKey}) AS "todayCheckInUserCount"
     `),
@@ -214,6 +218,8 @@ async function getAdminDashboardRawDataUncached() {
       pendingVerificationCount: toNumber(resolvedSiteStats?.pendingVerificationCount),
       pendingFriendLinkCount: toNumber(resolvedSiteStats?.pendingFriendLinkCount),
       pendingRssSourceApplicationCount: toNumber(resolvedSiteStats?.pendingRssSourceApplicationCount),
+      pendingOAuthClientCount: toNumber(resolvedSiteStats?.pendingOAuthClientCount),
+      pendingPaymentApplicationCount: toNumber(resolvedSiteStats?.pendingPaymentApplicationCount),
       pendingAdOrderCount,
       activeUserCount7d: toNumber(resolvedUserStats?.activeUserCount7d),
       mutedUserCount: toNumber(resolvedUserStats?.mutedUserCount),
@@ -297,6 +303,7 @@ export async function getAdminStructureRawData(options?: {
         postRequiredBadgeIds: true,
         replyRequiredVerificationTypeIds: true,
         replyRequiredBadgeIds: true,
+        postEditRulesJson: true,
         postListDisplayMode: true,
         postListLoadMode: true,
         moderatorScopes: {
@@ -361,6 +368,7 @@ export async function getAdminStructureRawData(options?: {
         postRequiredBadgeIds: true,
         replyRequiredVerificationTypeIds: true,
         replyRequiredBadgeIds: true,
+        postEditRulesJson: true,
         postListDisplayMode: true,
         postListLoadMode: true,
         moderatorScopes: {
@@ -393,6 +401,7 @@ export async function getAdminStructureRawData(options?: {
             postRequiredBadgeIds: true,
             replyRequiredVerificationTypeIds: true,
             replyRequiredBadgeIds: true,
+            postEditRulesJson: true,
             postListDisplayMode: true,
             postListLoadMode: true,
             moderatorScopes: {

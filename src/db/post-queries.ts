@@ -120,7 +120,11 @@ export async function findEditablePostBySlug(slug: string) {
   return prisma.post.findUnique({
     where: { slug },
     include: {
-      board: true,
+      board: {
+        include: {
+          zone: true,
+        },
+      },
       pollOptions: {
         orderBy: {
           sortOrder: "asc",

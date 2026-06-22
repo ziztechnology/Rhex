@@ -17,7 +17,7 @@ import {
   applyHookedUserPresentationToNamedItem,
   applyHookedUserPresentationToSitePosts,
 } from "@/lib/user-presentation-server"
-import { findActiveBoardsWithZoneAndPostCount, findBoardBySlugWithZoneAndPostCount, findBoardModeratorsByBoardId } from "@/db/board-read-queries"
+import { findActiveBoardsWithZoneAndPostCount, findBoardBySlugWithZoneAndPostCount, findBoardModeratorsByBoardId, findZoneModeratorsByZoneId } from "@/db/board-read-queries"
 import type { SitePostItem } from "@/lib/posts"
 import { TAXONOMY_CACHE_TAGS, TAXONOMY_CONTENT_CACHE_TAG } from "@/lib/taxonomy-cache"
 import { getUserDisplayName } from "@/lib/user-display"
@@ -139,38 +139,82 @@ export interface BoardModeratorItem {
   avatarPath: string | null
   vipLevel: number
   role: "USER" | "MODERATOR" | "ADMIN"
+  canEditSettings: boolean
+  canWithdrawTreasury: boolean
+  source: "zone" | "board"
   roleBadge?: PublicUserRoleBadge | null
+}
+
+export interface BoardModeratorGroups {
+  zoneModerators: BoardModeratorItem[]
+  boardModerators: BoardModeratorItem[]
+}
+
+type BoardModeratorScopeRecord =
+  | Awaited<ReturnType<typeof findBoardModeratorsByBoardId>>[number]
+  | Awaited<ReturnType<typeof findZoneModeratorsByZoneId>>[number]
+
+async function mapBoardModeratorScope(
+  scope: BoardModeratorScopeRecord,
+  source: BoardModeratorItem["source"],
+): Promise<BoardModeratorItem> {
+  const moderator = scope.moderator
+  const presentedModerator = await applyHookedUserPresentationToNamedItem({
+    id: moderator.id,
+    username: moderator.username,
+    displayName: getUserDisplayName(moderator),
+    avatarPath: moderator.avatarPath,
+    role: moderator.role,
+    status: moderator.status,
+    vipLevel: moderator.vipLevel,
+  })
+
+  return {
+    id: moderator.id,
+    username: moderator.username,
+    displayName: presentedModerator.displayName,
+    avatarPath: presentedModerator.avatarPath,
+    vipLevel: moderator.vipLevel ?? 0,
+    role: moderator.role,
+    canEditSettings: scope.canEditSettings,
+    canWithdrawTreasury: scope.canWithdrawTreasury,
+    source,
+    roleBadge: presentedModerator.roleBadge,
+  }
 }
 
 const getCachedBoardModerators = cache(async (boardId: string): Promise<BoardModeratorItem[]> => {
   const scopes = await findBoardModeratorsByBoardId(boardId)
 
-  return Promise.all(scopes.map(async (scope) => {
-    const moderator = scope.moderator
-    const presentedModerator = await applyHookedUserPresentationToNamedItem({
-      id: moderator.id,
-      username: moderator.username,
-      displayName: getUserDisplayName(moderator),
-      avatarPath: moderator.avatarPath,
-      role: moderator.role,
-      status: moderator.status,
-      vipLevel: moderator.vipLevel,
-    })
-
-    return {
-      id: moderator.id,
-      username: moderator.username,
-      displayName: presentedModerator.displayName,
-      avatarPath: presentedModerator.avatarPath,
-      vipLevel: moderator.vipLevel ?? 0,
-      role: moderator.role,
-      roleBadge: presentedModerator.roleBadge,
-    }
-  }))
+  return Promise.all(scopes.map((scope) => mapBoardModeratorScope(scope, "board")))
 })
 
 export async function getBoardModerators(boardId: string): Promise<BoardModeratorItem[]> {
   return getCachedBoardModerators(boardId)
+}
+
+const getCachedBoardModeratorGroups = cache(async (
+  boardId: string,
+  zoneId?: string | null,
+): Promise<BoardModeratorGroups> => {
+  const [boardScopes, zoneScopes] = await Promise.all([
+    findBoardModeratorsByBoardId(boardId),
+    zoneId ? findZoneModeratorsByZoneId(zoneId) : Promise.resolve([]),
+  ])
+
+  const [boardModerators, zoneModerators] = await Promise.all([
+    Promise.all(boardScopes.map((scope) => mapBoardModeratorScope(scope, "board"))),
+    Promise.all(zoneScopes.map((scope) => mapBoardModeratorScope(scope, "zone"))),
+  ])
+
+  return {
+    zoneModerators,
+    boardModerators,
+  }
+})
+
+export async function getBoardModeratorGroups(boardId: string, zoneId?: string | null): Promise<BoardModeratorGroups> {
+  return getCachedBoardModeratorGroups(boardId, zoneId)
 }
 
 export interface BoardPostPageResult {

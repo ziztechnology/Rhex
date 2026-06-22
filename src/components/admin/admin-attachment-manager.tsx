@@ -232,7 +232,7 @@ export function AdminAttachmentManager({ data }: AdminAttachmentManagerProps) {
 
       <AdminFilterCard
         title="附件管理"
-        description="集中查看上传记录和引用来源；默认列表使用轻量识别，已引用/无引用筛选读取后台扫描快照。"
+        description="集中查看上传记录和引用来源；当前列表实时识别当前页，已引用/无引用筛选读取后台扫描快照。"
         badge={<Badge variant="secondary" className="rounded-full">当前 {formatNumber(data.pagination.total)} 条</Badge>}
         activeBadges={activeFilterBadges}
       >

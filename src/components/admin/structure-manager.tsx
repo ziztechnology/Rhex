@@ -39,6 +39,7 @@ import {
 import type {
   BoardSidebarLinkDraft,
   ModalMode,
+  PostEditRuleDraft,
   StructureFormState,
   StructureFormTab,
   StructureManagerProps,
@@ -69,6 +70,7 @@ import { toast } from "@/components/ui/toast"
 import type { BoardItem, ZoneItem } from "@/lib/admin-structure-management"
 import { formatNumber } from "@/lib/formatters"
 import { DEFAULT_ALLOWED_POST_TYPES, normalizePostTypes } from "@/lib/post-types"
+import type { PostEditWindowRule } from "@/lib/post-edit-window"
 import { POST_LIST_DISPLAY_MODE_DEFAULT, POST_LIST_DISPLAY_MODE_GALLERY, POST_LIST_DISPLAY_MODE_WEIBO } from "@/lib/post-list-display"
 import { POST_LIST_LOAD_MODE_PAGINATION } from "@/lib/post-list-load-mode"
 import { cn } from "@/lib/utils"
@@ -473,6 +475,7 @@ function BoardRow({
           <Badge variant="outline">回复 {board.replyPointDelta ?? "继承"}</Badge>
           <Badge variant="outline">间隔 {board.postIntervalSeconds ?? "继承"}</Badge>
           <Badge variant="outline">VIP {board.minPostVipLevel ?? 0}</Badge>
+          <Badge variant="outline">{getPostEditRulesLabel(board.postEditRules, board.effectivePostEditRules)}</Badge>
           <Badge variant="outline">{board.moderatorsCanWithdrawTreasury ? "版主可提金库" : "仅管理员提金库"}</Badge>
           <Badge variant="outline">{getBoardHomeFeedVisibilityLabel(board)}</Badge>
           <Badge variant="outline">列表 {getPostListDisplayModeLabel(board.postListDisplayMode)}</Badge>
@@ -534,6 +537,17 @@ function getPostListDisplayModeLabel(value: string | null) {
   }
 
   return "继承分区"
+}
+
+function getPostEditRulesLabel(
+  rules: PostEditWindowRule[] | null,
+  effectiveRules: PostEditWindowRule[],
+) {
+  if (rules == null) {
+    return effectiveRules.length > 0 ? `编辑策略 ${effectiveRules.length}(继承)` : "编辑策略 继承全站"
+  }
+
+  return rules.length > 0 ? `编辑策略 ${rules.length}` : "编辑策略 全站默认"
 }
 
 function StructureModal({
@@ -697,6 +711,13 @@ function StructureModalForm({
       postRequiredBadgeIds: form.postRequiredBadgeIds,
       replyRequiredVerificationTypeIds: form.replyRequiredVerificationTypeIds,
       replyRequiredBadgeIds: form.replyRequiredBadgeIds,
+      postEditRulesInherit: isBoard ? form.postEditRuleMode === "inherit" : false,
+      postEditRules: form.postEditRules.map((rule) => ({
+        subject: rule.subject,
+        threshold: rule.threshold === "" ? undefined : Number(rule.threshold),
+        targetId: rule.targetId,
+        minutes: rule.minutes === "" ? -1 : Number(rule.minutes),
+      })),
       requirePostReview: form.requirePostReview,
       requireCommentReview: form.requireCommentReview,
       showInHomeFeed: form.showInHomeFeed,
@@ -821,6 +842,8 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       postRequiredBadgeIds: [],
       replyRequiredVerificationTypeIds: [],
       replyRequiredBadgeIds: [],
+      postEditRuleMode: "custom",
+      postEditRules: [],
       requirePostReview: false,
       requireCommentReview: false,
       showInHomeFeed: "true",
@@ -867,6 +890,8 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       postRequiredBadgeIds: [],
       replyRequiredVerificationTypeIds: [],
       replyRequiredBadgeIds: [],
+      postEditRuleMode: "inherit",
+      postEditRules: [],
       requirePostReview: false,
       requireCommentReview: false,
       showInHomeFeed: "",
@@ -913,6 +938,8 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
       postRequiredBadgeIds: modal.item.postRequiredBadgeIds,
       replyRequiredVerificationTypeIds: modal.item.replyRequiredVerificationTypeIds,
       replyRequiredBadgeIds: modal.item.replyRequiredBadgeIds,
+      postEditRuleMode: "custom",
+      postEditRules: toPostEditRuleDrafts(modal.item.postEditRules),
       requirePostReview: modal.item.requirePostReview,
       requireCommentReview: modal.item.requireCommentReview,
       showInHomeFeed: String(modal.item.showInHomeFeed),
@@ -958,6 +985,8 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
     postRequiredBadgeIds: modal.item.postRequiredBadgeIds,
     replyRequiredVerificationTypeIds: modal.item.replyRequiredVerificationTypeIds,
     replyRequiredBadgeIds: modal.item.replyRequiredBadgeIds,
+    postEditRuleMode: modal.item.postEditRules == null ? "inherit" : "custom",
+    postEditRules: toPostEditRuleDrafts(modal.item.postEditRules ?? []),
     requirePostReview: Boolean(modal.item.requirePostReview),
     requireCommentReview: Boolean(modal.item.requireCommentReview),
     showInHomeFeed: modal.item.showInHomeFeed == null ? "" : String(modal.item.showInHomeFeed),
@@ -966,6 +995,15 @@ function getInitialStructureFormState(modal: Exclude<ModalMode, null>, zones: Zo
     feedback: "",
     feedbackTone: "success",
   }
+}
+
+function toPostEditRuleDrafts(rules: PostEditWindowRule[]): PostEditRuleDraft[] {
+  return rules.map((rule) => ({
+    subject: rule.subject,
+    threshold: rule.threshold == null ? "1" : String(rule.threshold),
+    targetId: rule.targetId ?? "",
+    minutes: String(rule.minutes),
+  }))
 }
 
 function getStructureModalKey(modal: Exclude<ModalMode, null>) {

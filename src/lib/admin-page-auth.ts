@@ -1,9 +1,5 @@
-import { isFounderAdmin } from "@/lib/admin-founder"
-import {
-  getAdminManagementTier,
-  type AdminPermissionKey,
-} from "@/lib/admin-permission-policy"
-import { canAdminWithPermissionOverrides } from "@/lib/admin-permission-overrides"
+import type { AdminPermissionKey } from "@/lib/admin-permission-policy"
+import { resolveAdminPermissionState } from "@/lib/admin-permission-overrides"
 import { requireAdminActor } from "@/lib/moderator-permissions"
 
 export async function requireAdminActorWithPermission(
@@ -24,17 +20,19 @@ export async function getAdminActorPermissionState(
       tier: "USER" as const,
       authorized: false,
       reason: "unauthenticated" as const,
+      effectivePermissions: [] as AdminPermissionKey[],
     }
   }
 
-  const actorIsFounder = admin.role === "ADMIN" ? await isFounderAdmin(admin.id) : false
-  const tier = getAdminManagementTier(admin, { isFounder: actorIsFounder })
-  if (!await canAdminWithPermissionOverrides(admin, permission, { isFounder: actorIsFounder })) {
+  const permissionState = await resolveAdminPermissionState(admin)
+  const tier = permissionState.tier
+  if (!permissionState.effectivePermissions.includes(permission)) {
     return {
       actor: admin,
       tier,
       authorized: false,
       reason: "forbidden" as const,
+      effectivePermissions: permissionState.effectivePermissions,
     }
   }
 
@@ -43,5 +41,6 @@ export async function getAdminActorPermissionState(
     tier,
     authorized: true,
     reason: null,
+    effectivePermissions: permissionState.effectivePermissions,
   }
 }

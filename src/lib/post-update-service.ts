@@ -7,13 +7,14 @@ import { verifyCreatePostCaptchaWithAddonProviders } from "@/lib/addon-captcha-p
 import { readAddonFormFieldsFromBody } from "@/lib/addon-form-fields"
 import { canAdminActorManageBoardWithPermission } from "@/lib/admin-scope-permissions"
 import { resolveHookedStringValue } from "@/lib/addon-hook-values"
+import { resolveBoardSettings } from "@/lib/board-settings"
 import { extractSummaryFromContent } from "@/lib/content"
 import { enforceSensitiveText } from "@/lib/content-safety"
 import { createPostMentionNotifications, stripPostContentUserLinks } from "@/lib/post-mentions"
 import { normalizePostAttachmentInputs, syncPostAttachments } from "@/lib/post-attachments"
 import { processInternalPostCardEmbeds } from "@/lib/post-card-embed.server"
 import { buildPostContentDocument, getAllPostContentText, getPostContentMeta, serializePostContentDocument } from "@/lib/post-content"
-import { isPostStillEditable } from "@/lib/post-edit-window"
+import { isPostStillEditable, resolvePostEditWindowMinutes } from "@/lib/post-edit-window"
 import { normalizeManualTags, syncPostTaxonomy } from "@/lib/post-editor"
 import { getSiteSettings } from "@/lib/site-settings"
 import { validatePostPayload } from "@/lib/validators"
@@ -35,6 +36,12 @@ export async function updatePostFlow(input: {
     request: input.request,
     pathname: requestUrl.pathname,
     searchParams: requestUrl.searchParams,
+  }
+  const postCardEmbedOptions = {
+    requestUrl: input.request.url,
+    requestHeaders: input.request.headers,
+    currentPostId: input.postId,
+    postLinkDisplayMode: settings.postLinkDisplayMode,
   }
   const fallbackTitle = "占".repeat(settings.postTitleMinLength)
   const fallbackContent = "文".repeat(settings.postContentMinLength)
@@ -89,7 +96,13 @@ export async function updatePostFlow(input: {
     apiError(403, "没有权限编辑该帖子")
   }
 
-  const canEditNormally = canManagePost || isPostStillEditable(post.createdAt, settings.postEditableMinutes)
+  const boardSettings = resolveBoardSettings(post.board.zone, post.board)
+  const postEditableMinutes = resolvePostEditWindowMinutes(
+    settings.postEditableMinutes,
+    boardSettings.postEditRules,
+    input.currentUser,
+  )
+  const canEditNormally = canManagePost || isPostStillEditable(post.createdAt, postEditableMinutes)
 
   if (canEditNormally && !appendedContent) {
     await verifyCreatePostCaptchaWithAddonProviders({
@@ -161,10 +174,10 @@ export async function updatePostFlow(input: {
       replyUnlockContentWithCards,
       purchaseUnlockContentWithCards,
     ] = await Promise.all([
-      processInternalPostCardEmbeds(contentSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }),
-      loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
-      replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
-      purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, { requestUrl: input.request.url, requestHeaders: input.request.headers, currentPostId: input.postId }) : "",
+      processInternalPostCardEmbeds(contentSafety.sanitizedText, postCardEmbedOptions),
+      loginUnlockSafety ? processInternalPostCardEmbeds(loginUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
+      replyUnlockSafety ? processInternalPostCardEmbeds(replyUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
+      purchaseUnlockSafety ? processInternalPostCardEmbeds(purchaseUnlockSafety.sanitizedText, postCardEmbedOptions) : "",
     ])
 
     const normalizedReplyThreshold = replyUnlockContent ? (replyThreshold ?? 1) : undefined
@@ -309,9 +322,7 @@ export async function updatePostFlow(input: {
   const { value: hookedAppendedContent, changed: appendHookAdjusted } = resolveHookedStringValue(appendedContent, appendedContentHookResult.value)
   const appendSafety = await enforceSensitiveText({ scene: "post.content", text: hookedAppendedContent })
   const appendedContentWithCards = await processInternalPostCardEmbeds(appendSafety.sanitizedText, {
-    requestUrl: input.request.url,
-    requestHeaders: input.request.headers,
-    currentPostId: input.postId,
+    ...postCardEmbedOptions,
   })
   const nextSortOrder = (post.appendices[0]?.sortOrder ?? -1) + 1
   let mentionUserIds = [] as number[]

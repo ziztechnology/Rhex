@@ -16,6 +16,7 @@ import { renderMarkdownEmojiHtml, type MarkdownEmojiItem } from "@/lib/markdown-
 import { isSupportedMarkdownEmbedSrc, normalizeMarkdownMediaSrc } from "@/lib/markdown/media"
 import { escapeHtml } from "@/lib/markdown/shared"
 import { renderPostCardEmbedHtml } from "@/lib/post-card-embed"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 interface MarkdownHeadingToken {
   tag: string
@@ -57,6 +58,10 @@ const markdownRendererCache = new Map<string, MarkdownIt>()
 
 interface MarkdownRenderEnv {
   __usedHeadingSlugs?: Map<string, number>
+}
+
+interface MarkdownRenderOptions {
+  postLinkDisplayMode?: PostLinkDisplayMode
 }
 
 interface EscapedHtmlPlaceholder {
@@ -1175,7 +1180,7 @@ export function isImageOnlyMarkdownHtml(html: string) {
   return normalized.replace(/__MD_IMG__/g, "") === ""
 }
 
-export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
+export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[], options: MarkdownRenderOptions = {}) {
   const markdown = getMarkdownRenderer(emojiItems)
   const normalizedInput = normalizeLooseOrderedBlockquoteItems(renderWavySyntax(renderRubySyntax(wrapHtmlDocumentBlocks(renderUserLinkTokens(input)))))
   const escapedHtmlPlaceholders: EscapedHtmlPlaceholder[] = []
@@ -1197,7 +1202,9 @@ export function renderMarkdown(input: string, emojiItems: MarkdownEmojiItem[]) {
   }
 
   for (const line of lines) {
-    const postCardHtml = renderPostCardEmbedHtml(line.trim())
+    const postCardHtml = renderPostCardEmbedHtml(line.trim(), {
+      postLinkDisplayMode: options.postLinkDisplayMode,
+    })
     if (postCardHtml) {
       flushMarkdownBuffer()
       htmlChunks.push(postCardHtml)

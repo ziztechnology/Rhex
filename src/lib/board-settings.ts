@@ -1,6 +1,11 @@
 import type { Board, Zone } from "@/db/types"
 
 import { normalizePostTypes, type LocalPostType } from "@/lib/post-types"
+import {
+  normalizePostEditWindowRules,
+  resolvePostEditWindowMinutes,
+  type PostEditWindowRule,
+} from "@/lib/post-edit-window"
 import { isVipActive } from "@/lib/vip-status"
 
 function normalizeStringList(value: unknown): string[] {
@@ -40,6 +45,7 @@ export interface EffectiveBoardSettings {
   postRequiredBadgeIds: string[]
   replyRequiredVerificationTypeIds: string[]
   replyRequiredBadgeIds: string[]
+  postEditRules?: PostEditWindowRule[]
   showInHomeFeed: boolean
   moderatorsCanWithdrawBoardTreasury?: boolean
 }
@@ -66,6 +72,7 @@ export function resolveBoardSettings(zone?: Partial<Zone> | null, board?: Partia
     postRequiredBadgeIds?: string[] | null
     replyRequiredVerificationTypeIds?: string[] | null
     replyRequiredBadgeIds?: string[] | null
+    postEditRulesJson?: unknown
   }) | null | undefined
   const boardConfig = board as (Partial<Board> & {
     configJson?: unknown
@@ -75,6 +82,7 @@ export function resolveBoardSettings(zone?: Partial<Zone> | null, board?: Partia
     postRequiredBadgeIds?: string[] | null
     replyRequiredVerificationTypeIds?: string[] | null
     replyRequiredBadgeIds?: string[] | null
+    postEditRulesJson?: unknown
   }) | null | undefined
   const configJson = boardConfig?.configJson
   const boardTreasury = configJson && typeof configJson === "object" && !Array.isArray(configJson)
@@ -108,6 +116,7 @@ export function resolveBoardSettings(zone?: Partial<Zone> | null, board?: Partia
     postRequiredBadgeIds: normalizeStringList(boardConfig?.postIdentityGateInherit === true ? zoneAdvanced?.postRequiredBadgeIds : boardConfig?.postRequiredBadgeIds ?? zoneAdvanced?.postRequiredBadgeIds),
     replyRequiredVerificationTypeIds: normalizeStringList(boardConfig?.replyIdentityGateInherit === true ? zoneAdvanced?.replyRequiredVerificationTypeIds : boardConfig?.replyRequiredVerificationTypeIds ?? zoneAdvanced?.replyRequiredVerificationTypeIds),
     replyRequiredBadgeIds: normalizeStringList(boardConfig?.replyIdentityGateInherit === true ? zoneAdvanced?.replyRequiredBadgeIds : boardConfig?.replyRequiredBadgeIds ?? zoneAdvanced?.replyRequiredBadgeIds),
+    postEditRules: normalizePostEditWindowRules(boardConfig?.postEditRulesJson ?? zoneAdvanced?.postEditRulesJson),
     showInHomeFeed: board?.showInHomeFeed ?? zone?.showInHomeFeed ?? true,
     moderatorsCanWithdrawBoardTreasury: Boolean(
       boardTreasury
@@ -184,6 +193,18 @@ export function canUserAccess(user: BoardPermissionUser | null, settings: Effect
   }
 
   return { allowed: true, message: "" }
+}
+
+export function resolveBoardPostEditWindowMinutes(
+  settings: Pick<EffectiveBoardSettings, "postEditRules">,
+  defaultEditableMinutes: number,
+  user?: BoardPermissionUser | null,
+) {
+  return resolvePostEditWindowMinutes(defaultEditableMinutes, settings.postEditRules ?? [], user ? {
+    ...user,
+    grantedBadgeIds: user.grantedBadgeIds ?? [],
+    approvedVerificationTypeIds: user.approvedVerificationTypeIds ?? [],
+  } : null)
 }
 
 export function canUserOfflineComment(

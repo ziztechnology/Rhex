@@ -4,6 +4,7 @@ import { executeAddonAsyncWaterfallHook } from "@/addons-host/runtime/hooks"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { renderMarkdown } from "@/lib/markdown/render"
 import { processInternalPostCardEmbeds } from "@/lib/post-card-embed.server"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 export async function renderAddonPostContentHtml(input: {
   content: string
@@ -12,6 +13,7 @@ export async function renderAddonPostContentHtml(input: {
   searchParams?: URLSearchParams
   allowedOrigins?: readonly string[]
   currentPostId?: string
+  postLinkDisplayMode?: PostLinkDisplayMode
 }) {
   const normalizedContent = input.content.replace(/\r\n/g, "\n").trim()
   if (!normalizedContent) {
@@ -22,8 +24,11 @@ export async function renderAddonPostContentHtml(input: {
     requestUrl: input.pathname,
     allowedOrigins: input.allowedOrigins,
     currentPostId: input.currentPostId,
+    postLinkDisplayMode: input.postLinkDisplayMode,
   })
-  const renderedHtml = renderMarkdown(contentWithCards, input.markdownEmojiMap)
+  const renderedHtml = renderMarkdown(contentWithCards, input.markdownEmojiMap, {
+    postLinkDisplayMode: input.postLinkDisplayMode,
+  })
   const result = await executeAddonAsyncWaterfallHook("post.content.render", renderedHtml, {
     pathname: input.pathname,
     searchParams: input.searchParams,

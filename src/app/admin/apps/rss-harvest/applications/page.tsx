@@ -46,11 +46,12 @@ export default async function RssHarvestApplicationsPage(props: { searchParams: 
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription="审核用户提交的 RSS 源收录申请。"
       headerSearch={<AdminModuleSearch className="w-full" />}
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },
-        { label: "应用中心", href: "/admin/apps" },
+        { label: "内置应用", href: "/admin/apps" },
         { label: "RSS 抓取中心", href: "/admin/apps/rss-harvest" },
         { label: "RSS 收录申请" },
       ]}

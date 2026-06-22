@@ -1,4 +1,6 @@
 import { escapeHtml } from "@/lib/markdown/shared"
+import { getPostPath } from "@/lib/post-links"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 export const POST_CARD_EMBED_PREFIX = "::post-card"
 const POST_CARD_EMBED_INLINE_PREFIX = "::post-card-inline"
@@ -435,6 +437,15 @@ export interface PostCardEmbedTokenEntry {
   snapshot: EmbeddedPostCardSnapshot
 }
 
+interface PostCardEmbedLinkOptions {
+  postLinkDisplayMode?: PostLinkDisplayMode
+}
+
+export function resolvePostCardEmbedSnapshotUrl(snapshot: EmbeddedPostCardSnapshot, options: PostCardEmbedLinkOptions = {}) {
+  const mode = options.postLinkDisplayMode
+  return mode ? getPostPath({ id: snapshot.postId, slug: snapshot.slug }, { mode }) : snapshot.url
+}
+
 function buildLinePostCardEmbedResult(line: string, matches: InternalPostUrlInlineMatch[], tokenByRouteSegment: ReadonlyMap<string, PostCardEmbedTokenEntry>) {
   const entries: PostCardEmbedTokenEntry[] = []
   const seenPostIds = new Set<string>()
@@ -507,7 +518,7 @@ export function applyPostCardEmbedTokensToContent(
   return outputLines.join("\n")
 }
 
-export function replacePostCardEmbedTokensWithUrls(content: string) {
+export function replacePostCardEmbedTokensWithUrls(content: string, options: PostCardEmbedLinkOptions = {}) {
   const lines: string[] = []
   for (const line of content
     .replace(/\r\n/g, "\n")
@@ -519,7 +530,7 @@ export function replacePostCardEmbedTokensWithUrls(content: string) {
     }
 
     if (!isInlinePostCardEmbedTokenLine(line)) {
-      lines.push(snapshot.url)
+      lines.push(resolvePostCardEmbedSnapshotUrl(snapshot, options))
     }
   }
 
@@ -623,7 +634,7 @@ function renderMetric(type: "comment" | "view" | "like", value: number, label: s
   return `<span class="inline-flex items-center gap-1 whitespace-nowrap" aria-label="${escapeHtml(`${label} ${formatted}`)}">${renderMetricIcon(type)}<span>${formatted}</span></span>`
 }
 
-export function renderPostCardEmbedHtml(line: string) {
+export function renderPostCardEmbedHtml(line: string, options: PostCardEmbedLinkOptions = {}) {
   const snapshot = parsePostCardEmbedTokenWithMode(line)?.snapshot ?? null
   if (!snapshot) {
     return null
@@ -631,7 +642,7 @@ export function renderPostCardEmbedHtml(line: string) {
 
   const title = escapeHtml(snapshot.title)
   const authorName = escapeHtml(snapshot.authorName)
-  const url = escapeHtml(snapshot.url)
+  const url = escapeHtml(resolvePostCardEmbedSnapshotUrl(snapshot, options))
   const publishedAt = snapshot.publishedAt ? escapeHtml(formatPublishedAt(snapshot.publishedAt)) : ""
 
   return [

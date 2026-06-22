@@ -33,6 +33,7 @@ type FeedHeatSettings = Pick<
   | "heatStageThresholds"
   | "heatStageColors"
   | "markdownEmojiMap"
+  | "postLinkDisplayMode"
 >
 
 interface AddonFeedHookInput {
@@ -176,6 +177,7 @@ export async function buildHookedFeedDisplayItems(input: {
       contentMarkdown,
       previewMedia,
       markdownEmojiMap: input.settings.markdownEmojiMap,
+      postLinkDisplayMode: input.settings.postLinkDisplayMode,
     })
     const rewardConfig = parsePostRewardPoolConfigFromContent(post.content)
     const publishedAtRaw = resolveAddonPostDate(post.publishedAt, post.createdAt) ?? post.createdAt
@@ -301,6 +303,7 @@ export async function buildHookedPostStreamDisplayItems(input: {
       contentMarkdown,
       previewMedia,
       markdownEmojiMap: input.settings.markdownEmojiMap,
+      postLinkDisplayMode: input.settings.postLinkDisplayMode,
     })
     const rewardConfig = parsePostRewardPoolConfigFromContent(post.content)
     const publishedAtRaw = resolveAddonPostDate(post.publishedAt, post.createdAt) ?? post.createdAt

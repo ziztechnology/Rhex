@@ -21,6 +21,7 @@ import { ensureCanEditBoard, ensureCanEditZone, isSiteAdmin } from "@/lib/modera
 import { normalizeNullablePostListLoadMode } from "@/lib/post-list-load-mode"
 import { DEFAULT_ALLOWED_POST_TYPES_VALUE, serializePostTypes } from "@/lib/post-types"
 import { normalizeNullablePostListDisplayMode } from "@/lib/post-list-display"
+import { serializePostEditWindowRulesJson } from "@/lib/post-edit-window"
 
 
 function parseNullableNumber(value: unknown) {
@@ -137,6 +138,25 @@ function buildBoardConfigJson(body: Record<string, unknown>, currentConfig?: unk
   return Object.keys(nextConfig).length > 0 ? nextConfig as Prisma.InputJsonValue : Prisma.DbNull
 }
 
+function buildPostEditRulesJson(
+  body: Record<string, unknown>,
+  options: { isBoard: boolean },
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | undefined {
+  const hasInheritField = "postEditRulesInherit" in body
+  const hasRulesField = "postEditRules" in body
+
+  if (options.isBoard && hasInheritField && parseBoolean(body.postEditRulesInherit)) {
+    return Prisma.DbNull
+  }
+
+  if (!hasRulesField) {
+    return undefined
+  }
+
+  const serialized = serializePostEditWindowRulesJson(body.postEditRules)
+  return serialized ? serialized as unknown as Prisma.InputJsonValue : Prisma.DbNull
+}
+
 function sanitizeBoardConfigPayloadForActor(
   actor: AdminActor,
   body: Record<string, unknown>,
@@ -177,6 +197,7 @@ function buildBoardAdvancedPayload(body: Record<string, unknown>, currentConfig?
     postRequiredBadgeIds: parseStringList(body.postRequiredBadgeIds),
     replyRequiredVerificationTypeIds: parseStringList(body.replyRequiredVerificationTypeIds),
     replyRequiredBadgeIds: parseStringList(body.replyRequiredBadgeIds),
+    postEditRulesJson: buildPostEditRulesJson(body, { isBoard: true }),
     requirePostReview: body.requirePostReview === undefined ? undefined : parseBoolean(body.requirePostReview),
     requireCommentReview: body.requireCommentReview === undefined ? undefined : parseBoolean(body.requireCommentReview),
     showInHomeFeed: parseNullableBoolean(body.showInHomeFeed),
@@ -247,6 +268,7 @@ function buildZonePayload(
     postRequiredBadgeIds: parseStringList(body.postRequiredBadgeIds) ?? [],
     replyRequiredVerificationTypeIds: parseStringList(body.replyRequiredVerificationTypeIds) ?? [],
     replyRequiredBadgeIds: parseStringList(body.replyRequiredBadgeIds) ?? [],
+    postEditRulesJson: buildPostEditRulesJson(body, { isBoard: false }),
     postListDisplayMode: normalizeNullablePostListDisplayMode(body.postListDisplayMode) ?? null,
     postListLoadMode: normalizeNullablePostListLoadMode(body.postListLoadMode) ?? null,
   }

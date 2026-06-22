@@ -54,6 +54,38 @@ export function findBoardModeratorsByBoardId(boardId: string) {
     },
     orderBy: [{ createdAt: "asc" }, { moderatorId: "asc" }],
     select: {
+      canEditSettings: true,
+      canWithdrawTreasury: true,
+      moderator: {
+        select: {
+          id: true,
+          username: true,
+          nickname: true,
+          avatarPath: true,
+          status: true,
+          vipLevel: true,
+          vipExpiresAt: true,
+          role: true,
+        },
+      },
+    },
+  })
+}
+
+export function findZoneModeratorsByZoneId(zoneId: string) {
+  return prisma.moderatorZoneScope.findMany({
+    where: {
+      zoneId,
+      moderator: {
+        status: {
+          in: [UserStatus.ACTIVE, UserStatus.MUTED],
+        },
+      },
+    },
+    orderBy: [{ createdAt: "asc" }, { moderatorId: "asc" }],
+    select: {
+      canEditSettings: true,
+      canWithdrawTreasury: true,
       moderator: {
         select: {
           id: true,

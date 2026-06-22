@@ -54,11 +54,12 @@ export default async function WorkerAdminPage(props: PageProps<"/admin/apps/work
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription="查看后台任务 worker 的队列状态、延迟任务明细、执行日志、结算进度、死信告警和在线连接。"
       headerSearch={<AdminModuleSearch className="w-full" />}
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },
-        { label: "应用中心", href: "/admin/apps" },
+        { label: "内置应用", href: "/admin/apps" },
         { label: "Worker 中心" },
       ]}
     >

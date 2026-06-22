@@ -3,6 +3,7 @@ import "server-only"
 import { renderMarkdown } from "@/lib/markdown/render"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { omitPostListPreviewMediaFromMarkdown, type PostListPreviewMedia } from "@/lib/post-list-media"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 const PREVIEW_CONTENT_CACHE_MAX_ENTRIES = 500
 
@@ -23,11 +24,13 @@ function buildPreviewContentCacheKey(input: {
   contentMarkdown: string
   previewMedia?: PostListPreviewMedia | null
   markdownEmojiMap: MarkdownEmojiItem[]
+  postLinkDisplayMode?: PostLinkDisplayMode
 }) {
   return JSON.stringify({
     content: input.contentMarkdown,
     media: input.previewMedia ? `${input.previewMedia.type}:${input.previewMedia.src}` : "",
     emoji: input.markdownEmojiMap.map((item) => [item.shortcode, item.icon, item.label, item.displaySize]),
+    postLinkDisplayMode: input.postLinkDisplayMode ?? null,
   })
 }
 
@@ -52,12 +55,14 @@ export function buildPostListPreviewContent(input: {
   contentMarkdown: PreviewContentMarkdownInput
   previewMedia?: PostListPreviewMedia | null
   markdownEmojiMap: MarkdownEmojiItem[]
+  postLinkDisplayMode?: PostLinkDisplayMode
 }): PreviewContentResult {
   const contentMarkdown = normalizePreviewContentMarkdown(input.contentMarkdown)
   const key = buildPreviewContentCacheKey({
     contentMarkdown,
     previewMedia: input.previewMedia,
     markdownEmojiMap: input.markdownEmojiMap,
+    postLinkDisplayMode: input.postLinkDisplayMode,
   })
   const cached = previewContentCache.get(key)
   if (cached) {
@@ -69,7 +74,9 @@ export function buildPostListPreviewContent(input: {
   const markdown = omitPostListPreviewMediaFromMarkdown(contentMarkdown, input.previewMedia)
   const result = {
     markdown,
-    html: markdown ? renderMarkdown(markdown, input.markdownEmojiMap) : "",
+    html: markdown ? renderMarkdown(markdown, input.markdownEmojiMap, {
+      postLinkDisplayMode: input.postLinkDisplayMode,
+    }) : "",
   }
 
   rememberPreviewContent(key, result)

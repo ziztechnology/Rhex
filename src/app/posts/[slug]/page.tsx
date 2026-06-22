@@ -52,6 +52,7 @@ import { getPostTipSummary } from "@/lib/post-tips"
 import { getPostOfflineActionMeta } from "@/lib/post-offline"
 import { getPostAuctionSummary } from "@/lib/post-auctions"
 import { getPurchasedPostAttachmentIds, resolveAttachmentViewerState } from "@/lib/post-attachments"
+import { resolvePostEditWindowMinutes } from "@/lib/post-edit-window"
 import { isPostOpenForReplies, isPublicReadablePostStatus } from "@/lib/post-types"
 
 import { getPurchasedPostBlockBuyerCounts, getPurchasedPostBlockIds } from "@/lib/post-unlock"
@@ -432,6 +433,9 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
       })
     : []
   const hasAppendices = Boolean(displayPost.appendices && displayPost.appendices.length > 0)
+  const postEditWindowMinutes = boardAccessContext
+    ? resolvePostEditWindowMinutes(settings.postEditableMinutes, boardAccessContext.settings.postEditRules, currentUser)
+    : settings.postEditableMinutes
   const displayAttachments = (displayPost.attachments ?? []).map((attachment) => {
     const replyRequirementSatisfied = attachment.requireReplyUnlock && userReplyCount >= 1
     const viewerState = resolveAttachmentViewerState({
@@ -480,6 +484,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
               pathname: canonicalPath,
               searchParams: postPageSearchParams,
               allowedOrigins: [new URL(canonicalUrl).origin],
+              postLinkDisplayMode: settings.postLinkDisplayMode,
             })
           : ""
 
@@ -497,6 +502,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
           pathname: canonicalPath,
           searchParams: postPageSearchParams,
           allowedOrigins: [new URL(canonicalUrl).origin],
+          postLinkDisplayMode: settings.postLinkDisplayMode,
         }),
       })),
     ),
@@ -688,7 +694,7 @@ export default async function PostPage(props: PageProps<"/posts/[slug]">) {
                     postId={displayPost.id}
                     postSlug={displayPost.slug}
                     createdAt={displayPost.createdAt}
-                    editWindowMinutes={settings.postEditableMinutes}
+                    editWindowMinutes={postEditWindowMinutes}
                     lastAppendedAt={displayPost.lastAppendedAt}
                     appendixCount={displayPost.appendices?.length ?? 0}
                     offlinePrice={postOfflineMeta?.price.amount ?? 0}

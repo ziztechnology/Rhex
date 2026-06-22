@@ -398,14 +398,19 @@ function matchContainedPaths(value: unknown, rows: UploadListRow[]) {
     return []
   }
 
-  return rows.filter((row) => referenceValue.includes(row.urlPath) || referenceValue.includes(row.id)).map((row) => row.id)
+  return rows
+    .filter((row) => getUploadReferenceNeedles(row).some((needle) => referenceValue.includes(needle)))
+    .map((row) => row.id)
+}
+
+function getUploadReferenceNeedles(row: UploadListRow) {
+  return Array.from(new Set([row.urlPath, row.id].map((item) => item.trim()).filter(Boolean)))
 }
 
 function buildContainsOr(rows: UploadListRow[], field: string) {
-  return rows.flatMap((row) => ([
-    { [field]: { contains: row.urlPath } },
-    { [field]: { contains: row.id } },
-  ]))
+  return rows.flatMap((row) => getUploadReferenceNeedles(row).map((needle) => ({
+    [field]: { contains: needle },
+  })))
 }
 
 export async function resolveUploadReferenceStates(rows: UploadListRow[], options: ResolveUploadReferenceOptions = {}) {
@@ -418,6 +423,10 @@ export async function resolveUploadReferenceStates(rows: UploadListRow[], option
   const urlPaths = Array.from(new Set(rows.map((row) => row.urlPath).filter(Boolean)))
   const uploadIdsByUrlPath = new Map<string, string[]>()
   for (const row of rows) {
+    if (!row.urlPath) {
+      continue
+    }
+
     const existing = uploadIdsByUrlPath.get(row.urlPath) ?? []
     existing.push(row.id)
     uploadIdsByUrlPath.set(row.urlPath, existing)
@@ -867,7 +876,7 @@ async function getUploadPageFromUploads(where: Prisma.UploadWhereInput, page: nu
     take: pagination.pageSize,
     select: uploadListSelect,
   })
-  const states = await resolveUploadReferenceStates(rows, { deep: false })
+  const states = await resolveUploadReferenceStates(rows)
 
   return {
     pagination,

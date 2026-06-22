@@ -12,6 +12,7 @@ import {
 } from "@/lib/moderator-permissions"
 import { canAdmin, type AdminPermissionGrantInput } from "@/lib/admin-permission-policy"
 import { getPostStatusLabel, getPostTypeLabel } from "@/lib/post-types"
+import { normalizePostEditWindowRules, type PostEditWindowRule } from "@/lib/post-edit-window"
 import { getUserDisplayName } from "@/lib/user-display"
 
 export interface AdminDashboardData {
@@ -32,6 +33,8 @@ export interface AdminDashboardData {
     pendingVerificationCount: number
     pendingFriendLinkCount: number
     pendingRssSourceApplicationCount: number
+    pendingOAuthClientCount: number
+    pendingPaymentApplicationCount: number
     pendingAdOrderCount: number
     activeUserCount7d: number
     mutedUserCount: number
@@ -118,6 +121,7 @@ export interface AdminStructureData {
     postRequiredBadgeIds: string[]
     replyRequiredVerificationTypeIds: string[]
     replyRequiredBadgeIds: string[]
+    postEditRules: PostEditWindowRule[]
     requirePostReview: boolean
     requireCommentReview: boolean
     postListDisplayMode: string | null
@@ -177,6 +181,8 @@ export interface AdminStructureData {
     effectivePostRequiredBadgeIds: string[]
     effectiveReplyRequiredVerificationTypeIds: string[]
     effectiveReplyRequiredBadgeIds: string[]
+    postEditRules: PostEditWindowRule[] | null
+    effectivePostEditRules: PostEditWindowRule[]
     requirePostReview: boolean | null
     requireCommentReview: boolean | null
     postListDisplayMode: string | null
@@ -368,6 +374,7 @@ export function mapAdminStructureData(
         postRequiredBadgeIds: settings.postRequiredBadgeIds,
         replyRequiredVerificationTypeIds: settings.replyRequiredVerificationTypeIds,
         replyRequiredBadgeIds: settings.replyRequiredBadgeIds,
+        postEditRules: normalizePostEditWindowRules(zone.postEditRulesJson),
         requirePostReview: settings.requirePostReview,
         requireCommentReview: settings.requireCommentReview,
         postListDisplayMode: zone.postListDisplayMode ?? null,
@@ -432,6 +439,8 @@ export function mapAdminStructureData(
         effectivePostRequiredBadgeIds: settings.postRequiredBadgeIds,
         effectiveReplyRequiredVerificationTypeIds: settings.replyRequiredVerificationTypeIds,
         effectiveReplyRequiredBadgeIds: settings.replyRequiredBadgeIds,
+        postEditRules: board.postEditRulesJson == null ? null : normalizePostEditWindowRules(board.postEditRulesJson),
+        effectivePostEditRules: settings.postEditRules ?? [],
         requirePostReview: board.requirePostReview ?? null,
         requireCommentReview: board.requireCommentReview ?? null,
         postListDisplayMode: board.postListDisplayMode ?? null,

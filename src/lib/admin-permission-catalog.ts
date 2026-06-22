@@ -106,7 +106,7 @@ export const ADMIN_PERMISSION_CATALOG = [
   },
   {
     key: "admin.apps.manage",
-    label: "应用中心",
+    label: "内置应用",
     description: "管理内置应用和应用配置。",
     group: "system",
     highRisk: true,

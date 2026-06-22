@@ -7,7 +7,7 @@ import type { ReactNode, ComponentType } from "react"
 
 import { getAdminActorPermissionState } from "@/lib/admin-page-auth"
 import { getHostAppBySlug } from "@/lib/apps"
-import type { AdminManagementTier } from "@/lib/admin-permission-policy"
+import type { AdminManagementTier, AdminPermissionKey } from "@/lib/admin-permission-policy"
 
 import { getGobangAppConfig, getSelfServeAdsAppConfig, getYinYangContractAppConfig } from "@/lib/app-config"
 import { AiReplyAdminPage } from "@/components/admin/ai-reply-admin-page"
@@ -44,6 +44,7 @@ function renderAdminAppShell(params: {
   adminName: string
   adminRole: "ADMIN" | "MODERATOR"
   adminTier: AdminManagementTier
+  effectivePermissions: AdminPermissionKey[]
   appName: string
   appDescription?: string
   content: ReactNode
@@ -54,11 +55,12 @@ function renderAdminAppShell(params: {
       adminName={params.adminName}
       adminRole={params.adminRole}
       adminTier={params.adminTier}
+      effectivePermissions={params.effectivePermissions}
       headerDescription={params.appDescription ?? `${params.appName} 的后台配置与管理入口。`}
       headerSearch={<AdminModuleSearch className="w-full" />}
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },
-        { label: "应用中心", href: "/admin/apps" },
+        { label: "内置应用", href: "/admin/apps" },
         { label: params.appName },
       ]}
     >
@@ -135,6 +137,7 @@ export default async function AdminAppPage(props: PageProps<"/admin/apps/[app]">
     adminName: admin.nickname ?? admin.username,
     adminRole: admin.role,
     adminTier,
+    effectivePermissions: auth.effectivePermissions,
     appName: app.name,
     appDescription: app.description,
     content,

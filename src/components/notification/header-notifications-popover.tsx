@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Bell, ChevronRight, Loader2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
@@ -72,7 +71,6 @@ function HeaderUnreadBadge({ count, className }: { count: number; className?: st
 }
 
 export function HeaderNotificationsPopover({ unreadCount, badgeClassName }: HeaderNotificationsPopoverProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<HeaderNotificationItem[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -193,7 +191,7 @@ export function HeaderNotificationsPopover({ unreadCount, badgeClassName }: Head
       setItems((current) => current.filter((candidate) => candidate.id !== item.id))
       setVisibleUnreadCount((current) => Math.max(0, current - 1))
       setOpen(false)
-      router.push(item.relatedUrl)
+      window.location.assign(item.relatedUrl)
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : "标记通知失败")
     } finally {
@@ -268,7 +266,7 @@ export function HeaderNotificationsPopover({ unreadCount, badgeClassName }: Head
           ) : items.length > 0 ? (
             <div className="flex flex-col gap-1">
               {items.map((item) => (
-                <Link
+                <a
                   key={item.id}
                   href={item.relatedUrl}
                   className="group rounded-xl px-3 py-2.5 outline-hidden transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
@@ -281,7 +279,7 @@ export function HeaderNotificationsPopover({ unreadCount, badgeClassName }: Head
                   <p className="mt-1 line-clamp-1 text-sm font-medium text-foreground group-hover:text-primary">{item.title}</p>
                   <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.content}</p>
                   <p className="mt-1.5 truncate text-[11px] text-muted-foreground">来源：{item.senderName}</p>
-                </Link>
+                </a>
               ))}
             </div>
           ) : (

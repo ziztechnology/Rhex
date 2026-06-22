@@ -118,6 +118,19 @@ export function countNotificationsByUserId(userId: number) {
   })
 }
 
+export function findNotificationTargetById(userId: number, notificationId: string) {
+  return prisma.notification.findFirst({
+    where: {
+      id: notificationId,
+      userId,
+    },
+    select: {
+      relatedType: true,
+      relatedId: true,
+    },
+  })
+}
+
 export function findPostsByIds(postIds: string[]) {
   if (postIds.length === 0) {
     return Promise.resolve([])

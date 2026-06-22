@@ -7,6 +7,7 @@ import { getAllPostContentText } from "@/lib/post-content"
 import { getUserAvatarPath, getUserDisplayName } from "@/lib/user-display"
 import { resolvePostCoverImage } from "@/lib/post-cover"
 import { getPostPath } from "@/lib/post-links"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 import { getConfiguredSiteOrigin, normalizeSiteOrigin } from "@/lib/site-origin-config"
 
 const MAX_POST_CARD_EMBEDS_PER_CONTENT = 20
@@ -16,6 +17,7 @@ interface ProcessInternalPostCardEmbedsOptions {
   requestHeaders?: Headers
   currentPostId?: string
   allowedOrigins?: readonly string[]
+  postLinkDisplayMode?: PostLinkDisplayMode
 }
 
 function buildPostCardSummary(post: { summary?: string | null; content: string }) {
@@ -23,7 +25,10 @@ function buildPostCardSummary(post: { summary?: string | null; content: string }
   return summary ? summary.slice(0, 160) : null
 }
 
-function buildPostCardSnapshot(post: Awaited<ReturnType<typeof findPostCardEmbedSourceByRouteSegment>>): EmbeddedPostCardSnapshot | null {
+function buildPostCardSnapshot(
+  post: Awaited<ReturnType<typeof findPostCardEmbedSourceByRouteSegment>>,
+  postLinkDisplayMode: PostLinkDisplayMode = "ID",
+): EmbeddedPostCardSnapshot | null {
   if (!post) {
     return null
   }
@@ -34,7 +39,7 @@ function buildPostCardSnapshot(post: Awaited<ReturnType<typeof findPostCardEmbed
     version: 1,
     postId: post.id,
     slug: post.slug,
-    url: getPostPath({ id: post.id, slug: post.slug }, "ID"),
+    url: getPostPath({ id: post.id, slug: post.slug }, { mode: postLinkDisplayMode }),
     title: post.title,
     authorName: getUserDisplayName(post.author, "用户"),
     authorAvatarPath: getUserAvatarPath(post.author),
@@ -168,7 +173,7 @@ export async function processInternalPostCardEmbeds(content: string, options: Pr
       return
     }
 
-    const snapshot = buildPostCardSnapshot(post)
+    const snapshot = buildPostCardSnapshot(post, options.postLinkDisplayMode)
     if (!snapshot) {
       return
     }

@@ -60,7 +60,7 @@ export interface PostStreamDisplayItem {
 type PostStreamDisplaySettings = Pick<
   Awaited<ReturnType<typeof getSiteSettings>>,
   "heatViewWeight" | "heatCommentWeight" | "heatLikeWeight" | "heatTipCountWeight" | "heatTipPointsWeight" | "heatStageThresholds" | "heatStageColors"
-  | "markdownEmojiMap"
+  | "markdownEmojiMap" | "postLinkDisplayMode"
 >
 
 export function getVisiblePinLabel(
@@ -106,6 +106,7 @@ export function mapSitePostsToDisplayItems(
       contentMarkdown,
       previewMedia,
       markdownEmojiMap: settings.markdownEmojiMap,
+      postLinkDisplayMode: settings.postLinkDisplayMode,
     })
 
     return {

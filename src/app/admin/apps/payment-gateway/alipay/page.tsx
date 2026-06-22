@@ -34,6 +34,7 @@ export default async function PaymentGatewayAlipayAdminRoute() {
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription="单独维护支付宝接口自身的 AppId、沙箱环境、签名模式、公钥或证书，以及所有敏感密钥内容。"
       headerSearch={
         <div className="space-y-3">
@@ -42,7 +43,7 @@ export default async function PaymentGatewayAlipayAdminRoute() {
       }
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },
-        { label: "应用中心", href: "/admin/apps" },
+        { label: "内置应用", href: "/admin/apps" },
         { label: "支付网关", href: "/admin/apps/payment-gateway" },
         { label: "支付宝接口" },
       ]}

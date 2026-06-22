@@ -60,7 +60,7 @@ export interface FeedDisplayItem {
 type FeedDisplaySettings = Pick<
   Awaited<ReturnType<typeof getSiteSettings>>,
   "heatViewWeight" | "heatCommentWeight" | "heatLikeWeight" | "heatTipCountWeight" | "heatTipPointsWeight" | "heatStageThresholds" | "heatStageColors"
-  | "markdownEmojiMap"
+  | "markdownEmojiMap" | "postLinkDisplayMode"
 >
 
 export function getFeedPinLabel(pinScope?: string | null) {
@@ -92,6 +92,7 @@ export function mapForumFeedItemsToDisplayItems(
       contentMarkdown,
       previewMedia,
       markdownEmojiMap: settings.markdownEmojiMap,
+      postLinkDisplayMode: settings.postLinkDisplayMode,
     })
 
     return {

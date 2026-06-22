@@ -30,11 +30,12 @@ export default async function AiReplyModerationAdminPage() {
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription="审核 AI 生成的板块与标签修正建议。"
       headerSearch={<AdminModuleSearch className="w-full" />}
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },
-        { label: "应用中心", href: "/admin/apps" },
+        { label: "内置应用", href: "/admin/apps" },
         { label: "AI 回复", href: "/admin/apps/ai-reply" },
         { label: "审核建议" },
       ]}

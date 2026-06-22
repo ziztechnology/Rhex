@@ -5,11 +5,13 @@ import {
   Ban,
   Bookmark,
   CheckCircle2,
+  CreditCard,
   Eye,
   ExternalLink,
   FileText,
   Heart,
   Info,
+  KeyRound,
   LayoutGrid,
   Megaphone,
   MessageSquare,
@@ -255,7 +257,7 @@ export function AdminOverviewDashboard({
             <CardTitle>运营待办</CardTitle>
             <CardDescription>优先处理高影响的审核与处置任务。</CardDescription>
             <CardAction>
-              <Badge variant="secondary">8 项待看</Badge>
+              <Badge variant="secondary">10 项待看</Badge>
             </CardAction>
           </CardHeader>
           <CardContent className="grid gap-3 py-4 sm:grid-cols-2">
@@ -272,6 +274,20 @@ export function AdminOverviewDashboard({
               value={data.overview.pendingVerificationCount}
               description="处理用户身份与资质认证申请"
               icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+            />
+            <PendingReviewCard
+              href={`${getAdminSettingsHref("oauth", "clients")}?status=PENDING`}
+              title="OAuth 待审核"
+              value={data.overview.pendingOAuthClientCount}
+              description="审核用户提交的 OAuth 应用接入申请"
+              icon={<KeyRound className="h-3.5 w-3.5" />}
+            />
+            <PendingReviewCard
+              href={`${getAdminSettingsHref("oauth", "payment")}?status=PENDING`}
+              title="Pay 待审核"
+              value={data.overview.pendingPaymentApplicationCount}
+              description="审核用户提交的 Payment 应用收款申请"
+              icon={<CreditCard className="h-3.5 w-3.5" />}
             />
             <PendingReviewCard
               href={getAdminSettingsHref("friend-links")}

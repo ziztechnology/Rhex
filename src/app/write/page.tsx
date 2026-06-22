@@ -10,6 +10,7 @@ import { buildUserLevelThresholdOptions, buildVipLevelThresholdOptions } from "@
 import { getCurrentUser } from "@/lib/auth"
 import { buildLoginHrefWithRedirect } from "@/lib/auth-redirect"
 import { getBoards, type SiteBoardItem } from "@/lib/boards"
+import { resolveBoardPostEditWindowMinutes, resolveBoardSettings } from "@/lib/board-settings"
 import { getLevelDefinitions } from "@/lib/level-system"
 import { canAdminActorManageBoardWithPermission } from "@/lib/admin-scope-permissions"
 import { resolveAdminActorFromSessionUser } from "@/lib/moderator-permissions"
@@ -151,8 +152,12 @@ export default async function WritePage(props: PageProps<"/write">) {
       editingPost.board.zoneId,
     ),
   )
+  const editingPostBoardSettings = editingPost ? resolveBoardSettings(editingPost.board.zone, editingPost.board) : null
+  const editingPostEditWindowMinutes = editingPostBoardSettings
+    ? resolveBoardPostEditWindowMinutes(editingPostBoardSettings, settings.postEditableMinutes, user)
+    : settings.postEditableMinutes
   const canEditThisPost = Boolean(editingPost && (editingPost.authorId === user.id || canManageEditingPost))
-  const isStillEditable = Boolean(editingPost && isPostStillEditable(editingPost.createdAt, settings.postEditableMinutes)) || canManageEditingPost
+  const isStillEditable = Boolean(editingPost && isPostStillEditable(editingPost.createdAt, editingPostEditWindowMinutes)) || canManageEditingPost
   const addonFormSlots = {
     addonFormBefore: <AddonSlotRenderer slot="post.create.form.before" />,
     addonFormAfter: <AddonSlotRenderer slot="post.create.form.after" />,
@@ -165,6 +170,9 @@ export default async function WritePage(props: PageProps<"/write">) {
     addonSubmitBefore: <AddonSlotRenderer slot="post.create.submit.before" />,
     addonSubmitAfter: <AddonSlotRenderer slot="post.create.submit.after" />,
   }
+  const restorePostCardUrls = (content: string) => replacePostCardEmbedTokensWithUrls(content, {
+    postLinkDisplayMode: settings.postLinkDisplayMode,
+  })
 
   return (
     <div className="min-h-screen ">
@@ -187,7 +195,7 @@ export default async function WritePage(props: PageProps<"/write">) {
                 ) : !canEditThisPost ? (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">你无权编辑这篇帖子。</div>
                 ) : !isStillEditable ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">该帖子已超过可编辑窗口（{formatPostEditWindowLabel(settings.postEditableMinutes)}），请回到详情页使用附言追加功能。</div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">该帖子已超过可编辑窗口（{formatPostEditWindowLabel(editingPostEditWindowMinutes)}），请回到详情页使用附言追加功能。</div>
                 ) : (
                   <CreatePostForm
                     boardOptions={boardOptions}
@@ -223,14 +231,14 @@ export default async function WritePage(props: PageProps<"/write">) {
                     postLinkDisplayMode={settings.postLinkDisplayMode}
                     initialValues={{
                     title: editingPost.title,
-                    content: replacePostCardEmbedTokensWithUrls(publicBlock?.text ?? editingPost.content),
+                    content: restorePostCardUrls(publicBlock?.text ?? editingPost.content),
                     isAnonymous: editingPost.isAnonymous,
                     coverPath: editingPost.coverPath,
                     commentsVisibleToAuthorOnly: editingPost.commentsVisibleToAuthorOnly,
-                    loginUnlockContent: replacePostCardEmbedTokensWithUrls(loginUnlockBlock?.text ?? ""),
-                    replyUnlockContent: replacePostCardEmbedTokensWithUrls(replyUnlockBlock?.text ?? ""),
+                    loginUnlockContent: restorePostCardUrls(loginUnlockBlock?.text ?? ""),
+                    replyUnlockContent: restorePostCardUrls(replyUnlockBlock?.text ?? ""),
                     replyThreshold: replyUnlockBlock?.replyThreshold ?? 1,
-                    purchaseUnlockContent: replacePostCardEmbedTokensWithUrls(purchaseUnlockBlock?.text ?? ""),
+                    purchaseUnlockContent: restorePostCardUrls(purchaseUnlockBlock?.text ?? ""),
                     purchasePrice: purchaseUnlockBlock?.price ?? null,
                     minViewLevel: editingPost.minViewLevel,
                     minViewVipLevel: editingPost.minViewVipLevel,

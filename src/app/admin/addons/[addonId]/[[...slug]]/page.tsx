@@ -97,10 +97,11 @@ export default async function AdminAddonDetailPage({ params }: AdminAddonPagePro
 
   return (
     <AdminShell
-      currentKey="apps"
+      currentKey="addons"
       adminName={admin.nickname ?? admin.username}
       adminRole={admin.role}
       adminTier={adminTier}
+      effectivePermissions={auth.effectivePermissions}
       headerDescription={addon.manifest.description || "插件管理页面"}
       breadcrumbs={[
         { label: "后台控制台", href: "/admin" },

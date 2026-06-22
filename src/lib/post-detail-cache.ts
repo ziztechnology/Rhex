@@ -7,6 +7,7 @@ import { renderAddonPostContentHtml } from "@/lib/addon-post-content-render"
 import type { MarkdownEmojiItem } from "@/lib/markdown-emoji"
 import { MARKDOWN_RENDER_OUTPUT_VERSION } from "@/lib/markdown/render"
 import { getConfiguredSiteOrigin, normalizeSiteOrigin } from "@/lib/site-origin-config"
+import type { PostLinkDisplayMode } from "@/lib/site-settings"
 
 export const POST_SEO_CACHE_TAG = "post-seo"
 export const POST_DETAIL_DATA_CACHE_TAG = "post-detail-data"
@@ -155,11 +156,13 @@ export async function renderCachedPostContentHtml(input: {
   pathname?: string
   searchParams?: URLSearchParams | string
   allowedOrigins?: readonly string[]
+  postLinkDisplayMode?: PostLinkDisplayMode
 }) {
   const pathname = input.pathname ?? ""
   const searchParamsString = typeof input.searchParams === "string"
     ? input.searchParams
     : (input.searchParams?.toString() ?? "")
+  const postLinkDisplayMode = input.postLinkDisplayMode ?? "ID"
   const configuredSiteOrigin = getConfiguredSiteOrigin()
   const allowedOrigins = normalizeAllowedOrigins([
     ...(configuredSiteOrigin ? [configuredSiteOrigin] : []),
@@ -167,7 +170,7 @@ export async function renderCachedPostContentHtml(input: {
   ])
   const contentDigest = digest(input.content)
   const emojiDigest = digest(stableJson(input.markdownEmojiMap))
-  const requestContextDigest = digest(`${pathname}\n${searchParamsString}\n${stableJson(allowedOrigins)}`)
+  const requestContextDigest = digest(`${pathname}\n${searchParamsString}\n${stableJson(allowedOrigins)}\n${postLinkDisplayMode}`)
 
   return unstable_cache(
     async () => renderAddonPostContentHtml({
@@ -177,6 +180,7 @@ export async function renderCachedPostContentHtml(input: {
       searchParams: searchParamsString ? new URLSearchParams(searchParamsString) : undefined,
       allowedOrigins,
       currentPostId: input.postId,
+      postLinkDisplayMode,
     }),
     [
       POST_RENDERED_CONTENT_CACHE_TAG,

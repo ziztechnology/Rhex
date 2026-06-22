@@ -1,6 +1,5 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Trash2 } from "lucide-react"
@@ -25,6 +24,10 @@ export function NotificationListItem({ id, href, isRead, typeLabel, title, conte
   const [isDeleting, setIsDeleting] = useState(false)
 
   async function handleClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return
+    }
+
     if (isRead || isPending) {
       return
     }
@@ -46,7 +49,7 @@ export function NotificationListItem({ id, href, isRead, typeLabel, title, conte
         return
       }
 
-      router.push(href)
+      window.location.assign(href)
     } finally {
       setIsPending(false)
     }
@@ -102,14 +105,14 @@ export function NotificationListItem({ id, href, isRead, typeLabel, title, conte
           </Button>
         </div>
       </div>
-      <Link href={href} onClick={handleClick} className="mt-3 block rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
+      <a href={href} onClick={handleClick} className="mt-3 block rounded-lg outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
         <h2 className="text-base font-semibold">{title}</h2>
         <p className="mt-2 text-sm leading-7 text-muted-foreground">{content}</p>
         <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
           <span>来源：{senderName}</span>
           <span>{isDeleting ? "删除中..." : isPending ? "跳转中..." : "点击查看详情"}</span>
         </div>
-      </Link>
+      </a>
     </article>
   )
 }

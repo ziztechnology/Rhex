@@ -11,6 +11,7 @@ import {
   Mail,
   Megaphone,
   MessageSquare,
+  Plug2,
   Settings,
   Settings2,
   ShieldAlert,
@@ -44,7 +45,7 @@ export type AdminTabKey =
   | "security"
   | "settings"
 
-export type AdminNavKey = AdminTabKey | "apps" | "tasks"
+export type AdminNavKey = AdminTabKey | "apps" | "addons" | "tasks"
 
 export type AdminSettingsSectionKey =
   | "profile"
@@ -437,12 +438,22 @@ export const adminNavigation: AdminNavigationItem[] = [
    {
     key: "apps",
     href: "/admin/apps",
-    label: "应用中心",
+    label: "内置应用",
     description: "内置应用与独立后台入口。",
     icon: AppWindow,
     group: "system",
     adminOnly: true,
     permission: "admin.apps.manage",
+  },
+  {
+    key: "addons",
+    href: "/admin/addons",
+    label: "插件管理",
+    description: "安装、启用和配置插件。",
+    icon: Plug2,
+    group: "system",
+    adminOnly: true,
+    permission: "admin.addons.manage",
   },
   {
     key: "settings",

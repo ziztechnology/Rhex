@@ -1,3 +1,5 @@
+import type { PostEditWindowRule } from "@/lib/post-edit-window"
+
 export interface ZoneItem {
   id: string
   name: string
@@ -35,6 +37,7 @@ export interface ZoneItem {
   postRequiredBadgeIds: string[]
   replyRequiredVerificationTypeIds: string[]
   replyRequiredBadgeIds: string[]
+  postEditRules: PostEditWindowRule[]
   postListDisplayMode: string | null
   postListLoadMode: string | null
   moderators: StructureModeratorItem[]
@@ -112,6 +115,8 @@ export interface BoardItem {
   effectivePostRequiredBadgeIds: string[]
   effectiveReplyRequiredVerificationTypeIds: string[]
   effectiveReplyRequiredBadgeIds: string[]
+  postEditRules: PostEditWindowRule[] | null
+  effectivePostEditRules: PostEditWindowRule[]
   postListDisplayMode: string | null
   postListLoadMode: string | null
   moderators: StructureModeratorItem[]
