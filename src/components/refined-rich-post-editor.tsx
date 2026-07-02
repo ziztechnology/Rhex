@@ -666,10 +666,7 @@ export function RefinedRichPostEditor({
         panelRef={panels.emojiPanel.panelRef}
         markdownEmojiMap={markdownEmojiMap}
         onClose={panels.emojiPanel.close}
-        onSelect={(shortcode) => {
-          commands.handleEmojiSelect(shortcode)
-          panels.emojiPanel.close()
-        }}
+        onSelect={commands.handleEmojiSelect}
       />
       <ImageInsertPanel
         open={panels.imagePanel.open}
