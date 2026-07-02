@@ -33,6 +33,7 @@ type ProfileUpdateResponse = {
   activityVisibility: UserProfileVisibility
   introductionVisibility: UserProfileVisibility
   points: number
+  avatarPointCost: number
 }
 
 function toProfileUpdateResponse(input: {
@@ -49,7 +50,7 @@ function toProfileUpdateResponse(input: {
   activityVisibility: UserProfileVisibility
   introductionVisibility: UserProfileVisibility
   points: number
-}): ProfileUpdateResponse {
+}, avatarPointCost = 0): ProfileUpdateResponse {
   return {
     username: input.username,
     nickname: input.nickname ?? "",
@@ -68,6 +69,7 @@ function toProfileUpdateResponse(input: {
     activityVisibility: input.activityVisibility,
     introductionVisibility: input.introductionVisibility,
     points: input.points,
+    avatarPointCost,
   }
 }
 
@@ -340,6 +342,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
         userId: currentUser.id,
       })
     : { scopeKey: "AVATAR_CHANGE" as const, baseDelta: 0, finalDelta: 0, appliedRules: [] }
+  const avatarPointCost = Math.max(0, -avatarCostDelta.finalDelta)
   const totalRequiredPoints = [
     nicknameCostDelta.finalDelta,
     introductionCostDelta.finalDelta,
@@ -585,7 +588,7 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
     searchParams: requestUrl.searchParams,
   })
 
-  return apiSuccess(toProfileUpdateResponse(updatedProfile), messageParts.join("，"))
+  return apiSuccess(toProfileUpdateResponse(updatedProfile, avatarPointCost), messageParts.join("，"))
 
 
 }, {
@@ -594,4 +597,3 @@ export const POST = createUserRouteHandler<ProfileUpdateResponse>(async ({ reque
   unauthorizedMessage: "请先登录",
   allowStatuses: ["ACTIVE", "MUTED"],
 })
-

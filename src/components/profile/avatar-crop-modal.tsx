@@ -143,31 +143,44 @@ export function AvatarCropModal({
     }
   }
 
+  async function handleUploadOriginal() {
+    if (!onUploadOriginal) {
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      await onUploadOriginal()
+    } catch {
+      // Parent handles user-facing error messages.
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="裁剪头像"
+      title="剪裁头像"
       hideHeaderCloseButtonOnMobile
-      description="先裁剪成正方形头像，再上传到预览区。上传后还需要在资料页点击“确认保存头像”才会正式生效。"
+      description="可以直接使用原图，或调整取景后剪裁保存。提交成功后头像立即生效。"
       size="xl"
       closeDisabled={saving}
       footer={(
-        <div className="flex flex-col gap-3 sm:items-end">
-          <p className="text-xs text-muted-foreground">上传只是生成预览，最后一步请回到资料页确认保存。</p>
-          <div className="flex flex-wrap justify-end gap-3">
+        <div className="flex flex-wrap justify-end gap-3">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             取消
           </Button>
           {onUploadOriginal ? (
-            <Button type="button" variant="outline" onClick={onUploadOriginal} disabled={saving}>
-              {saving ? "上传中..." : "不裁剪，上传到预览"}
+            <Button type="button" variant="outline" onClick={handleUploadOriginal} disabled={saving}>
+              {saving ? "保存中..." : "不剪裁提交保存"}
             </Button>
           ) : null}
           <Button type="button" onClick={handleConfirm} disabled={saving || !croppedAreaPixels}>
-            {saving ? "上传中..." : "裁剪并上传到预览"}
+            {saving ? "保存中..." : "剪裁并提交保存"}
           </Button>
-          </div>
         </div>
       )}
     >
@@ -220,7 +233,7 @@ export function AvatarCropModal({
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-medium">裁剪结果预览</p>
-            <p className="mt-1 text-xs text-muted-foreground">上传保存前，先看一下三种尺寸下的显示效果。</p>
+            <p className="mt-1 text-xs text-muted-foreground">提交保存前，先看一下三种尺寸下的显示效果。</p>
             <div className="mt-4 space-y-4">
               <PreviewSize label="大尺寸" size="lg" avatarPath={previewUrl} name={previewName} loading={previewLoading} />
               <PreviewSize label="中尺寸" size="md" avatarPath={previewUrl} name={previewName} loading={previewLoading} />
@@ -231,7 +244,6 @@ export function AvatarCropModal({
           <div className="rounded-xl border border-dashed border-border bg-background/70 p-4 text-xs leading-6 text-muted-foreground">
             <p>1. 头像会按你当前裁剪结果导出为正方形图片。</p>
             <p>2. 建议把主体放在圆形框中央，避免小尺寸下边缘被裁掉。</p>
-            <p>3. 点击“裁剪并上传到预览”后，仍需回到资料页点击“确认保存头像”才会正式写入个人资料。</p>
           </div>
         </div>
       </div>

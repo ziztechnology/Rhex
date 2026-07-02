@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { AlertCircle, Camera, CheckCircle2, LoaderCircle, Mail, PencilLine, Smartphone, UserRound } from "lucide-react"
+import { Camera, LoaderCircle, Mail, PencilLine, Smartphone, UserRound } from "lucide-react"
 
 import { PasswordChangeForm } from "@/components/profile/password-change-form"
 import { Modal } from "@/components/ui/modal"
@@ -207,18 +207,6 @@ export function ProfileEditForm({
   const normalizedSavedAvatarPath = savedAvatarPath.trim()
   const normalizedPendingAvatarPath = pendingAvatarPath.trim()
   const hasSavedAvatar = normalizedSavedAvatarPath.length > 0
-  const avatarChanged = useMemo(() => normalizedPendingAvatarPath !== normalizedSavedAvatarPath, [normalizedPendingAvatarPath, normalizedSavedAvatarPath])
-  const avatarRequiresPayment = avatarChanged && hasSavedAvatar
-  const avatarStatusTitle = avatarChanged
-    ? normalizedPendingAvatarPath
-      ? "新头像已上传，尚未保存"
-      : "头像已重置，尚未保存"
-    : "头像设置已保存"
-  const avatarStatusDescription = avatarChanged
-    ? normalizedPendingAvatarPath
-      ? "当前页面预览的是新头像。请点击“确认保存头像”完成最后一步，否则离开页面后不会生效。"
-      : "当前操作会恢复默认头像。请点击右侧“确认保存头像”完成最后一步。"
-    : ""
   const nicknameHint = nicknameChangePointCost > 0
     ? nicknameChanged
       ? `本次修改昵称将扣除 ${nicknameChangePointCost} ${pointName}。${nicknameChangePriceDescription ? `${nicknameChangePriceDescription}。` : ""}昵称全站唯一。`
@@ -231,14 +219,8 @@ export function ProfileEditForm({
     : `${introductionChangePriceDescription ? `${introductionChangePriceDescription}，` : ""}当前修改介绍免费，支持 Markdown。`
   const avatarHint = avatarChangePointCost > 0
     ? !hasSavedAvatar
-      ? avatarChanged
-        ? `这是你首次设置头像，本次保存免费。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}上传后需手动确认保存。`
-        : `你还没有上传过头像，首次设置免费。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}上传后需手动确认保存。`
-      : avatarRequiresPayment
-        ? normalizedPendingAvatarPath
-          ? `本次更换头像将扣除 ${avatarChangePointCost} ${pointName}。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}上传后需手动确认保存。`
-          : `本次重置头像将扣除 ${avatarChangePointCost} ${pointName}。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}重置后会恢复默认头像。`
-        : `更换头像或重置头像需消耗 ${avatarChangePointCost} ${pointName}。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}上传后需手动确认保存。`
+      ? `你还没有设置头像，首次设置免费。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}`
+      : `更换头像或重置头像将消耗 ${avatarChangePointCost} ${pointName}。${avatarChangePriceDescription ? `${avatarChangePriceDescription}。` : ""}`
     : `${avatarChangePriceDescription ? `${avatarChangePriceDescription}，` : ""}首次设置、更换头像和重置头像当前都免费。`
   const avatarRules = [
     avatarChangePointCost > 0
@@ -249,7 +231,13 @@ export function ProfileEditForm({
   ]
 
   useEffect(() => {
-    setActiveSection(normalizedSections.includes(initialSection) ? initialSection : normalizedSections[0])
+    setActiveSection((current) => {
+      if (normalizedSections.includes(current)) {
+        return current
+      }
+
+      return normalizedSections.includes(initialSection) ? initialSection : normalizedSections[0]
+    })
   }, [initialSection, normalizedSections])
 
   useEffect(() => {
@@ -300,12 +288,22 @@ export function ProfileEditForm({
     router.refresh()
   }
 
-  async function uploadAvatarFile(file: File) {
+  function showAvatarSaveSuccess(result: { data?: { avatarPointCost?: unknown } }, fallbackPointCost: number) {
+    const responsePointCost = Number(result.data?.avatarPointCost)
+    const consumedPointCost = Number.isFinite(responsePointCost)
+      ? Math.max(0, responsePointCost)
+      : Math.max(0, fallbackPointCost)
+
+    toast.success(`头像保存成功，消耗 ${consumedPointCost} ${pointName}`, "头像保存成功")
+  }
+
+  async function saveAvatarFile(file: File) {
     const fallbackPreviewUrl = previewUrl || pendingAvatarPath || savedAvatarPath || initialAvatarPath || ""
     const nextPreviewUrl = URL.createObjectURL(file)
 
     updatePreviewUrl(nextPreviewUrl)
     setUploading(true)
+    setAvatarSaving(true)
 
     const formData = new FormData()
     formData.append("file", file)
@@ -323,16 +321,24 @@ export function ProfileEditForm({
       }
 
       const uploadedPath = result.data?.urlPath ?? ""
-      setPendingAvatarPath(uploadedPath)
-      updatePreviewUrl(uploadedPath || nextPreviewUrl)
+      if (!uploadedPath) {
+        throw new Error("头像上传成功，但未返回文件地址")
+      }
+
+      const profileResult = await updateProfile({ avatarPath: uploadedPath })
+      const nextAvatarPath = profileResult.data?.avatarPath ?? uploadedPath
+      setSavedAvatarPath(nextAvatarPath)
+      setPendingAvatarPath(nextAvatarPath)
+      updatePreviewUrl(nextAvatarPath)
       clearCropSource()
-      toast.success("新头像已进入预览，请点击“确认保存头像”完成最后一步", "头像待保存")
+      showAvatarSaveSuccess(profileResult, hasSavedAvatar ? avatarChangePointCost : 0)
     } catch (error) {
       updatePreviewUrl(fallbackPreviewUrl)
-      toast.error(error instanceof Error ? error.message : "头像上传失败", "头像上传失败")
+      toast.error(error instanceof Error ? error.message : "头像保存失败", "头像保存失败")
       throw error
     } finally {
       setUploading(false)
+      setAvatarSaving(false)
     }
   }
 
@@ -485,7 +491,7 @@ export function ProfileEditForm({
   }
 
   async function handleAvatarCropConfirm(croppedFile: File) {
-    await uploadAvatarFile(croppedFile)
+    await saveAvatarFile(croppedFile)
   }
 
   async function handleAvatarOriginalUpload() {
@@ -493,19 +499,19 @@ export function ProfileEditForm({
       return
     }
 
-    await uploadAvatarFile(cropSourceFile)
+    await saveAvatarFile(cropSourceFile)
   }
 
-  async function handleAvatarSave() {
+  async function handleAvatarReset() {
     setAvatarSaving(true)
 
     try {
-      const result = await updateProfile({ avatarPath: pendingAvatarPath })
-      const nextAvatarPath = result.data?.avatarPath ?? pendingAvatarPath
+      const result = await updateProfile({ avatarPath: "" })
+      const nextAvatarPath = result.data?.avatarPath ?? ""
       setSavedAvatarPath(nextAvatarPath)
       setPendingAvatarPath(nextAvatarPath)
       updatePreviewUrl(nextAvatarPath)
-      toast.success(result.message ?? "头像已更新", "头像保存成功")
+      showAvatarSaveSuccess(result, hasSavedAvatar ? avatarChangePointCost : 0)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败", "头像保存失败")
     } finally {
@@ -709,7 +715,7 @@ export function ProfileEditForm({
               </div>
               <div>
                 <p className="text-base font-semibold">当前头像</p>
-                <p className="mt-2 text-sm text-muted-foreground">支持图片上传，先裁剪再上传，并在保存前预览最终效果。</p>
+                <p className="mt-2 text-sm text-muted-foreground">选择图片后，可直接使用原图或剪裁取景并提交保存。</p>
                 <p className="mt-1 text-xs text-muted-foreground">{avatarHint}</p>
                 <p className="mt-1 text-xs text-muted-foreground">建议使用清晰正方形头像，大小控制在 {normalizedAvatarMaxFileSizeMb}MB 以内。</p>
               </div>
@@ -722,24 +728,11 @@ export function ProfileEditForm({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setPendingAvatarPath("")
-                  updatePreviewUrl("")
-                }}
+                onClick={handleAvatarReset}
                 disabled={uploading || avatarSaving || (!normalizedPendingAvatarPath && !normalizedSavedAvatarPath)}
               >
-                重置头像
+                {avatarSaving ? "保存中..." : "重置头像"}
               </Button>
-              <Button type="button" size="lg" onClick={handleAvatarSave} disabled={uploading || avatarSaving || !avatarChanged} className={avatarChanged ? "shadow-sm" : undefined}>
-                {avatarSaving ? "保存中..." : avatarChanged ? "确认保存头像" : "头像已保存"}
-              </Button>
-            </div>
-          </div>
-          <div className={avatarChanged ? "flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900" : "flex items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-muted-foreground"}>
-            {avatarChanged ? <AlertCircle className="mt-0.5 size-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">{avatarStatusTitle}</p>
-              <p className="text-xs leading-6">{avatarStatusDescription}</p>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
